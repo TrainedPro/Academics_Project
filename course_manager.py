@@ -33,6 +33,7 @@ class CourseView:
     def get_user_input(self):
         batch = input('Enter Batch: ')
         program = input('Enter Program: ')
+        program = program.upper()
         print('Choose an option:')
         print('1. Spring Semesters')
         print('2. Fall Semesters')
