@@ -12,45 +12,22 @@ class CourseModel:
             self.data = list(reader)
 
     def filter_courses(self, batch, program, semester_type):
-        if semester_type == '1':
-            # Spring Semesters (Even)
-            return [
-                {
-                    'Course Code': row['Course Code'],
-                    'Course Title': row['Course Title'],
-                    'Credits': row['Credits (Theory + Lab)'],
-                    'Prerequisite': row['Prerequisite'],
-                    'Semester': row['Semester']
-                }
-                for row in self.data
-                if row['Batch'] == batch and row['Program'] == program and int(row['Semester']) % 2 == 0
-            ]
-        elif semester_type == '2':
-            # Fall Semesters (Odd)
-            return [
-                {
-                    'Course Code': row['Course Code'],
-                    'Course Title': row['Course Title'],
-                    'Credits': row['Credits (Theory + Lab)'],
-                    'Prerequisite': row['Prerequisite'],
-                    'Semester': row['Semester']
-                }
-                for row in self.data
-                if row['Batch'] == batch and row['Program'] == program and int(row['Semester']) % 2 != 0
-            ]
-        else:
-            # All Semesters
-            return [
-                {
-                    'Course Code': row['Course Code'],
-                    'Course Title': row['Course Title'],
-                    'Credits': row['Credits (Theory + Lab)'],
-                    'Prerequisite': row['Prerequisite'],
-                    'Semester': row['Semester']
-                }
-                for row in self.data
-                if row['Batch'] == batch and row['Program'] == program
-            ]
+        return [
+            {
+                'Course Code': row['Course Code'],
+                'Course Title': row['Course Title'],
+                'Credits': row['Credits (Theory + Lab)'],
+                'Prerequisite': row['Prerequisite'],
+                'Semester': row['Semester']
+            }
+            for row in self.data
+            if row['Batch'] == batch and row['Program'] == program and (
+                semester_type == '1' and int(row['Semester']) % 2 == 0 or
+                semester_type == '2' and int(row['Semester']) % 2 != 0 or
+                semester_type not in ['1', '2']
+            )
+        ]
+
 
 class CourseView:
     def get_user_input(self):
