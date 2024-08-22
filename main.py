@@ -14,11 +14,11 @@ class CourseModel:
     def filter_courses(self, batch, program, semester_type):
         return [
             {
+                'Semester': row['Semester'],
                 'Course Code': row['Course Code'],
                 'Course Title': row['Course Title'],
                 'Credits': row['Credits (Theory + Lab)'],
-                'Prerequisite': row['Prerequisite'],
-                'Semester': row['Semester']
+                'Prerequisite': row['Prerequisite']
             }
             for row in self.data
             if row['Batch'] == batch and row['Program'] == program and (
@@ -56,8 +56,9 @@ class CourseView:
         if not courses:
             print('No courses found for the given batch, program, and semester type.')
             return
-
+        
         for course in courses:
+            print(f'Semester: {course["Semester"]}')
             print(f'Course Code: {course["Course Code"]}')
             print(f'Course Title: {course["Course Title"]}')
             print(f'Credits: {course["Credits"]}')
