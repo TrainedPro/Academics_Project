@@ -9,7 +9,6 @@ class CourseModel:
         self.program_name = program_name
         self.search_term = f"Tentative Study Plan-Bachelor of Science ({program_name})"
         self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)
 
     def find_page_text(self) -> str:
         """
@@ -30,7 +29,7 @@ class CourseModel:
                     text = page.get_text()
 
                     if self.search_term in text:
-                        self.logger.info(f"Search term found on page {page_number + 1}.")
+                        self.logger.debug(f"Search term found on page {page_number + 1}.")
                         return text
 
                 raise ValueError(f"Search term '{self.search_term}' not found in the document.")
@@ -54,23 +53,20 @@ class CourseModel:
         """
         lines = [x.strip() for x in text.split('\n')]
         courses = []
-
+        
         idx = 0
-        while lines[idx] != self.search_term:
+        while 'Semester-I' not in lines[idx]:
             idx += 1
 
-        idx += 1
-
-        while 'Semester-' not in lines[idx]:
-            idx += 1
-
-        semester = 0
+        semester = 0 # can also be calculated through `total_count`
+        total_count = 0
         while idx < len(lines) - 1:
             if 'Total' in lines[idx]:
                 idx += 3
+                total_count += 1
 
-            elif 'Eligibility for FYP-I' in lines[idx]:
-                break
+                if total_count >= 8:
+                    break
 
             elif 'Semester-' in lines[idx]:
                 semester += 1
@@ -103,6 +99,17 @@ class CourseModel:
                 if prereq == '—':
                     prereq = ''
 
+                self.logger.debug(msg=[
+                    idx,
+                    self.program_name,
+                    semester,
+                    course_code,
+                    course_title,
+                    credit_hours_class,
+                    credit_hours_lab,
+                    prereq]
+                )
+
                 courses.append((
                     self.program_name,
                     semester,
@@ -118,7 +125,6 @@ class CourseModel:
 class CourseView:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)
 
     def write_courses_to_csv(self, courses: List[Tuple[str, int, str, str, int, int, str]], filename: str):
         """
@@ -144,7 +150,6 @@ class CourseController:
         self.model = model
         self.view = view
         self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)
 
     def execute(self):
         try:
@@ -155,7 +160,7 @@ class CourseController:
             courses = self.model.parse_course_info(page_text)
 
             # Print the parsed courses for verification
-            self.logger.info(f"Parsed courses: {courses}")
+            self.logger.debug(f"Parsed courses: {courses}")
 
             # Write the course information to a CSV file
             csv_filename = f"_{self.model.program_name.replace(' ', '_')}_Courses.csv"
@@ -166,8 +171,9 @@ class CourseController:
 
 # Example usage
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)  # Set up logging configuration
-    model = CourseModel(pdf_path="Computing Programs.pdf", program_name="Software Engineering")
-    view = CourseView()
-    controller = CourseController(model=model, view=view)
-    controller.execute()
+    logging.basicConfig(level=logging.INFO)  # Set up logging configuration
+    for program in ["Artificial Intelligence", "Computer Science", "Cyber Security", "Data Science", "Software Engineering"]:
+        model = CourseModel(pdf_path="Computing Programs.pdf", program_name=program)
+        view = CourseView()
+        controller = CourseController(model=model, view=view)
+        controller.execute()
