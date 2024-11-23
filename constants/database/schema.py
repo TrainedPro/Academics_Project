@@ -40,8 +40,8 @@ CREATE TABLE IF NOT EXISTS Prerequisites (
 CREATE_STUDENT_TABLE = '''CREATE TABLE IF NOT EXISTS "Students" (
      "Roll_No" TEXT PRIMARY KEY,
     "Name" TEXT,
-    "Cr_attended" INTEGER,
-    "Cr_earned" INTEGER,
+    "Cr_Attended" INTEGER,
+    "Cr_Earned" INTEGER,
     "Cgpa" REAL,
     "Warning" INTEGER,
     "Status" TEXT

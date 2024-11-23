@@ -19,3 +19,10 @@ INSERT_PREREQUISITE = '''
 INSERT OR IGNORE INTO Prerequisites (Course_Code, Prerequisite_Code)
 VALUES (?, ?)
 '''
+
+INSERT_STUDENT = '''
+INSERT OR IGNORE INTO Students (
+    Roll_No, Name, Cr_Attended, Cr_Earned, Cgpa, Warning, Status
+) VALUES (?, ?, ?, ?, ?, ?, ?)
+'''
+
