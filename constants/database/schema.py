@@ -36,3 +36,26 @@ CREATE TABLE IF NOT EXISTS Prerequisites (
     PRIMARY KEY (Course_Code, Prerequisite_Code)
 )
 '''
+
+CREATE_STUDENT_TABLE = '''CREATE TABLE IF NOT EXISTS "Students" (
+     "Roll_No" TEXT PRIMARY KEY,
+    "Name" TEXT,
+    "Cr_attended" INTEGER,
+    "Cr_earned" INTEGER,
+    "Cgpa" REAL,
+    "Warning" INTEGER,
+    "Status" TEXT
+)
+'''
+CREATE_GRADE_TABLE = '''
+CREATE TABLE IF NOT EXISTS "grades" (
+    "Roll_No" TEXT,
+    "Grade" TEXT,
+    "Course_Code" TEXT,
+    PRIMARY KEY("Roll_No", "Course_code"),
+    FOREIGN KEY("Course_Code") REFERENCES "Courses"("Course_Code"),
+    FOREIGN KEY("Roll_No") REFERENCES "Students"("Roll_No")
+)
+'''
+
+
