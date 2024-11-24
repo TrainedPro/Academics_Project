@@ -13,8 +13,7 @@ from constants.database import insertions
 class Course:
     course_code: str
     course_title: str
-    credit_hours_class: int
-    credit_hours_lab: int
+    credit_hours: int
     prerequisite_course_code: Optional[str] = None
 
 class CourseProcessor:
@@ -82,15 +81,25 @@ class CourseProcessor:
                 credit_hours_lab, idx = int(lines[idx]), idx + 1
                 prereq = lines[idx] if lines[idx] != '—' else None
                 idx += 1
-                course = Course(
+
+                # Create the base course (including lab credit if >1)
+                courses.append((Course(
                     course_code=course_code,
                     course_title=course_title,
-                    credit_hours_class=credit_hours_class,
-                    credit_hours_lab=credit_hours_lab,
+                    credit_hours=credit_hours_class + (credit_hours_lab if credit_hours_lab > 1 else 0),
                     prerequisite_course_code=prereq,
-                )
-                self.logger.debug(f"Parsed course: {json.dumps(course.__dict__, indent=2)}")
-                courses.append((course, program_name, semester))  # Include program_name and semester
+                ), program_name, semester))
+
+                # Create a separate lab course if lab credits = 1
+                if credit_hours_lab == 1:
+                    lab_code = course_code[:1] + 'L' + course_code[2:]
+                    lab_title = f"{course_title} - Lab"
+                    courses.append((Course(
+                        course_code=lab_code,
+                        course_title=lab_title,
+                        credit_hours=1,
+                        prerequisite_course_code=prereq,
+                    ), program_name, semester))
         return courses
 
     def _extract_multiline_code(self, lines: List[str], idx: int) -> Tuple[str, int]:
@@ -117,8 +126,7 @@ class CourseProcessor:
 
         for course, program_name, semester in courses:
             course_data.append((
-                course.course_code, course.course_title, course.credit_hours_class,
-                course.credit_hours_lab, course.prerequisite_course_code
+                course.course_code, course.course_title, course.credit_hours, course.prerequisite_course_code
             ))
             program_courses.append((program_name, course.course_code, semester))
 
@@ -133,7 +141,7 @@ class CourseProcessor:
 
                 # Insert all courses first (ignoring prerequisites for now)
                 course_data = [
-                    (course.course_code, course.course_title, course.credit_hours_class, course.credit_hours_lab, None)
+                    (course.course_code, course.course_title, course.credit_hours, None)
                     for course, _, _ in courses
                 ]
                 cursor.executemany(insertions.INSERT_COURSE, course_data)

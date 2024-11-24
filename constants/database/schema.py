@@ -10,12 +10,18 @@ CREATE_TABLE_COURSES = '''
 CREATE TABLE IF NOT EXISTS courses (
     course_code TEXT PRIMARY KEY,
     course_title TEXT NOT NULL,
-    credit_hours_class INTEGER NOT NULL,
-    credit_hours_lab INTEGER NOT NULL,
+    credit_hours INTEGER NOT NULL,
     prerequisite_course_code TEXT,
     FOREIGN KEY (prerequisite_course_code) REFERENCES courses (course_code)
 )
 '''
+
+INSERT_COURSE = '''
+INSERT OR IGNORE INTO courses (
+    course_code, course_title, credit_hours, prerequisite_course_code
+) VALUES (?, ?, ?, ?)
+'''
+
 
 CREATE_TABLE_PROGRAM_COURSES = '''
 CREATE TABLE IF NOT EXISTS program_courses (
