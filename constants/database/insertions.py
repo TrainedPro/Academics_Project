@@ -6,7 +6,7 @@ INSERT OR IGNORE INTO programs (program_name) VALUES (?)
 
 INSERT_COURSE = '''
 INSERT OR IGNORE INTO courses (
-    course_code, course_title, credit_hours_class, credit_hours_lab, prerequisites
+    course_code, course_title, credit_hours_class, credit_hours_lab, prerequisite_course_code
 ) VALUES (?, ?, ?, ?, ?)
 '''
 
@@ -19,10 +19,12 @@ INSERT_STUDENT = '''
 INSERT OR REPLACE INTO students (
     roll_no, 
     name, 
+    section
     credit_hours_attempted, 
     credit_hours_earned, 
     cgpa, 
     warning_status, 
-    enrollment_status
-) VALUES (?, ?, ?, ?, ?, ?, ?)
+    enrollment_status,
+    specialization
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 '''

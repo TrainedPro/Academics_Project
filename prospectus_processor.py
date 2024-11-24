@@ -15,7 +15,7 @@ class Course:
     course_title: str
     credit_hours_class: int
     credit_hours_lab: int
-    prerequisites: Optional[str] = None
+    prerequisite_course_code: Optional[str] = None
 
 class CourseProcessor:
     programs = ["Artificial Intelligence", "Computer Science", "Cyber Security", "Data Science", "Software Engineering"]
@@ -87,7 +87,7 @@ class CourseProcessor:
                     course_title=course_title,
                     credit_hours_class=credit_hours_class,
                     credit_hours_lab=credit_hours_lab,
-                    prerequisites=prereq,
+                    prerequisite_course_code=prereq,
                 )
                 self.logger.debug(f"Parsed course: {json.dumps(course.__dict__, indent=2)}")
                 courses.append((course, program_name, semester))  # Include program_name and semester
@@ -112,17 +112,13 @@ class CourseProcessor:
     def insert_courses(self, courses: List[Tuple[Course, str, int]]):
         """Inserts courses into the database."""
         programs = {program for _, program, _ in courses}
-        prerequisites = []
         course_data = []
         program_courses = []
 
         for course, program_name, semester in courses:
-            if course.prerequisites:
-                for prereq in course.prerequisites.split(';'):
-                    prerequisites.append((course.course_code, prereq.strip()))
             course_data.append((
                 course.course_code, course.course_title, course.credit_hours_class,
-                course.credit_hours_lab, course.prerequisites
+                course.credit_hours_lab, course.prerequisite_course_code
             ))
             program_courses.append((program_name, course.course_code, semester))
 
@@ -135,8 +131,26 @@ class CourseProcessor:
                 self.logger.debug(f"Inserting programs: {programs}")
                 cursor.executemany(insertions.INSERT_PROGRAM, [(program,) for program in programs])
 
-                self.logger.debug(f"Inserting courses: {course_data}")
+                # Insert all courses first (ignoring prerequisites for now)
+                course_data = [
+                    (course.course_code, course.course_title, course.credit_hours_class, course.credit_hours_lab, None)
+                    for course, _, _ in courses
+                ]
                 cursor.executemany(insertions.INSERT_COURSE, course_data)
+
+                # Update prerequisites after all courses are inserted
+                # ensures foreign key constraints are met
+                update_query = '''
+                UPDATE courses
+                SET prerequisite_course_code = ?
+                WHERE course_code = ?
+                '''
+                prerequisites_data = [
+                    (course.prerequisite_course_code, course.course_code)
+                    for course, _, _ in courses if course.prerequisite_course_code
+                ]
+                cursor.executemany(update_query, prerequisites_data)
+
 
                 self.logger.debug(f"Inserting program-course associations: {program_courses}")
                 cursor.executemany(insertions.INSERT_PROGRAM_COURSE, program_courses)
@@ -162,8 +176,8 @@ class CourseProcessor:
 
 if __name__ == "__main__":
     logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s [%(levelname)s] %(message)s (line %(lineno)d)",
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
             logging.FileHandler("course_processor.log"),
             logging.StreamHandler()

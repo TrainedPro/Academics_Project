@@ -33,10 +33,12 @@ CREATE_TABLE_STUDENTS = '''
 CREATE TABLE IF NOT EXISTS students (
     roll_no TEXT PRIMARY KEY,
     name TEXT NOT NULL,
+    section TEXT NOT NULL,
     credit_hours_attempted INTEGER NOT NULL,
     credit_hours_earned INTEGER NOT NULL,
     cgpa REAL NOT NULL,
     warning_status INTEGER NOT NULL CHECK (warning_status BETWEEN 0 AND 3),
     enrollment_status TEXT NOT NULL
+    specialization TEXT
 )
 '''
