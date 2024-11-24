@@ -19,7 +19,7 @@ INSERT_STUDENT = '''
 INSERT OR REPLACE INTO students (
     roll_no, 
     name, 
-    section
+    section,
     credit_hours_attempted, 
     credit_hours_earned, 
     cgpa, 

@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS students (
     credit_hours_earned INTEGER NOT NULL,
     cgpa REAL NOT NULL,
     warning_status INTEGER NOT NULL CHECK (warning_status BETWEEN 0 AND 3),
-    enrollment_status TEXT NOT NULL
+    enrollment_status TEXT NOT NULL,
     specialization TEXT
 )
 '''
