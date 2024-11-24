@@ -28,3 +28,8 @@ INSERT OR REPLACE INTO students (
     specialization
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 '''
+
+INSERT_GRADE = '''
+INSERT OR IGNORE INTO grades (roll_no, course_code, grade)
+VALUES (?, ?, ?)
+'''

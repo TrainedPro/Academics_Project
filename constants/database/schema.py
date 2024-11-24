@@ -41,3 +41,14 @@ CREATE TABLE IF NOT EXISTS students (
     specialization TEXT
 )
 '''
+
+CREATE_TABLE_GRADES = '''
+CREATE TABLE IF NOT EXISTS grades (
+    roll_no TEXT NOT NULL,
+    course_code TEXT NOT NULL,
+    grade TEXT NOT NULL,
+    PRIMARY KEY (roll_no, course_code),
+    FOREIGN KEY (roll_no) REFERENCES students (roll_no)
+    FOREIGN KEY (course_code) REFERENCES courses (course_code)
+)
+'''

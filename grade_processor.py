@@ -5,8 +5,9 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Set
 from dataclasses import dataclass
 
+from constants.database.schema import CREATE_TABLE_STUDENTS, CREATE_TABLE_GRADES
+from constants.database.insertions import INSERT_STUDENT, INSERT_GRADE
 from constants.database.config import DB_NAME
-from constants.database.insertions import INSERT_STUDENT
 
 # Set up logging
 logging.basicConfig(
@@ -14,6 +15,14 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+@dataclass
+class Course:
+    """Data class to represent a course."""
+    code: str
+    title: str
+    credit_hours: int
+    prerequisite_code: str = None
 
 @dataclass
 class Student:
@@ -34,16 +43,25 @@ class CourseValidator:
     
     def __init__(self, db_path: str):
         self.db_path = db_path
-        self.valid_courses: Set[str] = set()
+        self.valid_courses: Dict[str, Course] = {}
         self._load_valid_courses()
     
     def _load_valid_courses(self) -> None:
-        """Load all valid course codes from the database."""
+        """Load all valid courses from the database."""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT course_code FROM courses")
-                self.valid_courses = {row[0] for row in cursor.fetchall()}
+                cursor.execute("""
+                    SELECT course_code, course_title, credit_hours, prerequisite_course_code 
+                    FROM courses
+                """)
+                for row in cursor.fetchall():
+                    self.valid_courses[row[0]] = Course(
+                        code=row[0],
+                        title=row[1],
+                        credit_hours=row[2],
+                        prerequisite_code=row[3]
+                    )
                 logger.info(f"Loaded {len(self.valid_courses)} valid courses from database")
         except sqlite3.Error as e:
             logger.error(f"Error loading courses from database: {e}")
@@ -64,16 +82,40 @@ class CourseValidator:
             logger.error(f"Error parsing course info from '{course_column}': {e}")
             raise
 
-    def validate_course(self, course_column: str) -> Tuple[bool, str]:
-        """Validate a course against the database."""
+    def validate_course(self, course_column: str) -> Tuple[bool, str, Dict]:
+        """
+        Validate a course against the database.
+        Returns: (is_valid, course_code, validation_info)
+        """
         try:
-            _, course_code = self.parse_course_info(course_column)
-            is_valid = course_code in self.valid_courses
-            if not is_valid:
-                return False, f"Course code '{course_code}' not found in database"
-            return True, course_code
+            course_title, course_code = self.parse_course_info(course_column)
+            
+            if course_code not in self.valid_courses:
+                return False, course_code, {
+                    "error": "Course not found in database",
+                    "title": course_title,
+                    "code": course_code
+                }
+            
+            db_course = self.valid_courses[course_code]
+            if db_course.title != course_title:
+                return False, course_code, {
+                    "error": "Course title mismatch",
+                    "csv_title": course_title,
+                    "db_title": db_course.title,
+                    "code": course_code
+                }
+            
+            return True, course_code, {
+                "title": course_title,
+                "code": course_code,
+                "credit_hours": db_course.credit_hours
+            }
         except Exception as e:
-            return False, str(e)
+            return False, "", {
+                "error": str(e),
+                "column": course_column
+            }
 
 class GradeParser:
     """Handles parsing of grade CSV file and database operations."""
@@ -82,7 +124,19 @@ class GradeParser:
         """Initialize the parser with database path."""
         self.db_path = db_path
         self.course_validator = CourseValidator(db_path)
-        self.invalid_courses: Dict[str, str] = {}  # course_column: error_message
+        self.validation_results: Dict[str, Dict] = {}  # course_column: validation_info
+        self._initialize_database()
+    
+    def _initialize_database(self):
+        """Sets up the database schema if it does not already exist."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            # Create tables using schema constants
+            cursor.execute(CREATE_TABLE_STUDENTS)
+            cursor.execute(CREATE_TABLE_GRADES)
+
+            logger.info("Database schema initialized.")
     
     def parse_csv(self, file_path: str) -> List[Student]:
         """Parse the CSV file and return a list of Student objects."""
@@ -99,15 +153,22 @@ class GradeParser:
                 course_columns = headers[10:]  # Columns after specialization
                 
                 # Validate all courses before processing
+                has_invalid_courses = False
                 for course_column in course_columns:
-                    is_valid, message = self.course_validator.validate_course(course_column)
+                    is_valid, _, info = self.course_validator.validate_course(course_column)
+                    self.validation_results[course_column] = info
                     if not is_valid:
-                        self.invalid_courses[course_column] = message
+                        has_invalid_courses = True
+                        logger.warning(f"Invalid course: {info}")
                 
-                if self.invalid_courses:
-                    logger.warning("Found invalid courses:")
-                    for course, error in self.invalid_courses.items():
-                        logger.warning(f"  - {course}: {error}")
+                if has_invalid_courses:
+                    logger.warning("\nFound invalid courses:")
+                    for course, info in self.validation_results.items():
+                        if "error" in info:
+                            logger.warning(f"  - {course}: {info['error']}")
+                            if "db_title" in info:
+                                logger.warning(f"    CSV title: {info['csv_title']}")
+                                logger.warning(f"    DB title: {info['db_title']}")
                 
                 # Process each student row
                 for row in csv_reader:
@@ -118,10 +179,9 @@ class GradeParser:
                     grades = {}
                     for course_column, grade in zip(course_columns, row[10:]):
                         if grade and grade != '-':
-                            # Only add grades for valid courses
-                            if course_column not in self.invalid_courses:
-                                _, course_code = self.course_validator.parse_course_info(course_column)
-                                grades[course_code] = grade
+                            info = self.validation_results[course_column]
+                            if "error" not in info:  # Only add grades for valid courses
+                                grades[info['code']] = grade
                     
                     student = Student(
                         roll_no=row[1],
@@ -164,17 +224,13 @@ class GradeParser:
                     ))
                     
                     # Insert grade records
-                    student_id = cursor.lastrowid
                     grade_records = [
-                        (student_id, course_code, grade)
+                        (student.roll_no, course_code, grade)
                         for course_code, grade in student.grades.items()
                     ]
                     
                     if grade_records:
-                        cursor.executemany('''
-                            INSERT INTO grades (student_id, course_code, grade)
-                            VALUES (?, ?, ?)
-                        ''', grade_records)
+                        cursor.executemany(INSERT_GRADE, grade_records)
                 
                 conn.commit()
                 logger.info("Successfully saved all records to database")
@@ -196,17 +252,18 @@ if __name__ == "__main__":
         students = parser.parse_csv(str(csv_path))
         
         # Check if there were any invalid courses
-        if parser.invalid_courses:
-            logger.warning("\nWarning: Some courses were not found in the database:")
-            for course, error in parser.invalid_courses.items():
-                logger.warning(f"  - {course}: {error}")
-            
-            # You might want to prompt the user here
+        invalid_courses = [
+            course for course, info in parser.validation_results.items()
+            if "error" in info
+        ]
+        
+        if invalid_courses:
+            logger.warning("\nWarning: Found invalid courses in the CSV.")
             response = input("\nDo you want to continue with the valid courses only? (y/n): ")
             if response.lower() != 'y':
                 logger.info("Operation cancelled by user")
                 exit(0)
-        
+
         # Save to database
         parser.save_to_database(students)
         
