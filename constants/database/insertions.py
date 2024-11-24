@@ -14,3 +14,15 @@ INSERT_PROGRAM_COURSE = '''
 INSERT OR IGNORE INTO program_courses (program_name, course_code, semester)
 VALUES (?, ?, ?)
 '''
+
+INSERT_STUDENT = '''
+INSERT OR REPLACE INTO students (
+    roll_no, 
+    name, 
+    credit_hours_attempted, 
+    credit_hours_earned, 
+    cgpa, 
+    warning_status, 
+    enrollment_status
+) VALUES (?, ?, ?, ?, ?, ?, ?)
+'''
