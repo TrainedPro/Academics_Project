@@ -32,10 +32,9 @@ class CourseProcessor:
             cursor = conn.cursor()
             
             # Create tables using schema constants
-            cursor.execute(schema.CREATE_PROGRAMS_TABLE)
-            cursor.execute(schema.CREATE_COURSES_TABLE)
-            cursor.execute(schema.CREATE_PROGRAM_COURSES_TABLE)
-            cursor.execute(schema.CREATE_PREREQUISITES_TABLE)
+            cursor.execute(schema.CREATE_TABLE_PROGRAMS)
+            cursor.execute(schema.CREATE_TABLE_COURSES)
+            cursor.execute(schema.CREATE_TABLE_PROGRAM_COURSES)
 
             self.logger.info("Database schema initialized.")
 
@@ -134,28 +133,15 @@ class CourseProcessor:
             try:
                 # Bulk insertions
                 self.logger.debug(f"Inserting programs: {programs}")
-                cursor.executemany('INSERT OR IGNORE INTO Programs (Program_Name) VALUES (?)', [(program,) for program in programs])
+                cursor.executemany(insertions.INSERT_PROGRAM, [(program,) for program in programs])
 
                 self.logger.debug(f"Inserting courses: {course_data}")
-                cursor.executemany('''
-                    INSERT OR IGNORE INTO Courses (
-                        Course_Code, Course_Title, Credit_Hours_Class, Credit_Hours_Lab, Pre_requisites
-                    ) VALUES (?, ?, ?, ?, ?)
-                ''', course_data)
+                cursor.executemany(insertions.INSERT_COURSE, course_data)
 
                 self.logger.debug(f"Inserting program-course associations: {program_courses}")
-                cursor.executemany('''
-                    INSERT OR IGNORE INTO Program_Courses (Program_Name, Course_Code, Semester)
-                    VALUES (?, ?, ?)
-                ''', program_courses)
-
-                self.logger.debug(f"Inserting prerequisites: {prerequisites}")
-                cursor.executemany('''
-                    INSERT OR IGNORE INTO Prerequisites (Course_Code, Prerequisite_Code)
-                    VALUES (?, ?)
-                ''', prerequisites)
-
+                cursor.executemany(insertions.INSERT_PROGRAM_COURSE, program_courses)
                 conn.commit()
+
                 self.logger.info(f"Rows inserted into the database.")
             except sqlite3.Error as e:
                 self.logger.error(f"Error inserting data into database: {e}")
@@ -184,6 +170,7 @@ if __name__ == "__main__":
         ]
     )
 
+    #! change for the GUI
     pdf_path = "Computing Programs.pdf"
     processor = CourseProcessor(pdf_path)
 
