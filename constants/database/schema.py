@@ -16,13 +16,6 @@ CREATE TABLE IF NOT EXISTS courses (
 )
 '''
 
-INSERT_COURSE = '''
-INSERT OR IGNORE INTO courses (
-    course_code, course_title, credit_hours, prerequisite_course_code
-) VALUES (?, ?, ?, ?)
-'''
-
-
 CREATE_TABLE_PROGRAM_COURSES = '''
 CREATE TABLE IF NOT EXISTS program_courses (
     program_name TEXT NOT NULL,
