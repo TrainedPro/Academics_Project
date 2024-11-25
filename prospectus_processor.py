@@ -3,7 +3,6 @@ import sqlite3
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 import logging
-import json
 
 from constants.database import config
 from constants.database import schema
@@ -55,6 +54,42 @@ class CourseProcessor:
         except Exception as e:
             self.logger.error(f"Error processing PDF: {e}")
             raise
+    
+    def append_courses_and_labs(courses: List[Tuple[Course, str, int]],
+                                course_code: str, course_title: str,
+                                credit_hours_class: int, credit_hours_lab: int,
+                                prereq: str, program_name: str, semester: int) -> None:
+        """
+        Appends the base course and lab course (if applicable) to the courses list.
+
+        Args:
+            courses: The list of courses to append to.
+            course_code: The course code.
+            course_title: The course title.
+            credit_hours_class: The credit hours for the class.
+            credit_hours_lab: The credit hours for the lab.
+            prereq: Prerequisite course code (if any).
+            program_name: The program name.
+            semester: The semester number.
+        """
+        # Append the base course
+        courses.append((Course(
+            course_code=course_code,
+            course_title=course_title,
+            credit_hours=credit_hours_class + (credit_hours_lab if credit_hours_lab > 1 else 0),
+            prerequisite_course_code=prereq,
+        ), program_name, semester))
+
+        # Append the lab course if lab credits = 1
+        if credit_hours_lab == 1:
+            lab_code = course_code[:1] + 'L' + course_code[2:]
+            lab_title = f"{course_title} - Lab"
+            courses.append((Course(
+                course_code=lab_code,
+                course_title=lab_title,
+                credit_hours=1,
+                prerequisite_course_code=prereq,
+            ), program_name, semester))
 
     def parse_courses(self, text: str, program_name: str) -> List[Course]:
         """Parses the course details from the extracted text."""
@@ -82,25 +117,15 @@ class CourseProcessor:
                 prereq = lines[idx] if lines[idx] != '—' else None
                 idx += 1
 
-                # Create the base course (including lab credit if >1)
-                courses.append((Course(
-                    course_code=course_code,
-                    course_title=course_title,
-                    credit_hours=credit_hours_class + (credit_hours_lab if credit_hours_lab > 1 else 0),
-                    prerequisite_course_code=prereq,
-                ), program_name, semester))
+                # Use the helper function to append courses and labs
+                self.append_courses_and_labs(
+                    courses, course_code, course_title,
+                    credit_hours_class, credit_hours_lab,
+                    prereq, program_name, semester
+                )
 
-                # Create a separate lab course if lab credits = 1
-                if credit_hours_lab == 1:
-                    lab_code = course_code[:1] + 'L' + course_code[2:]
-                    lab_title = f"{course_title} - Lab"
-                    courses.append((Course(
-                        course_code=lab_code,
-                        course_title=lab_title,
-                        credit_hours=1,
-                        prerequisite_course_code=prereq,
-                    ), program_name, semester))
         return courses
+
 
     def _extract_multiline_code(self, lines: List[str], idx: int) -> Tuple[str, int]:
         course_code = lines[idx]
