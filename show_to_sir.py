@@ -150,7 +150,7 @@ main_menu_page.pack(fill="both", expand=True)
 notebook.add(main_menu_page, text="Main Menu")
 
 # Add a background image to the main menu page
-image = Image.open("/home/ac/Desktop/Academics_Project/pictures/f.png")  # Update with the correct file path
+image = Image.open("pictures/f.png")  # Update with the correct file path
 background_image = ImageTk.PhotoImage(image)
 background_label = tk.Label(main_menu_page, image=background_image)
 background_label.place(relwidth=1, relheight=1)
@@ -169,31 +169,52 @@ show_courses_button.grid(row=0, column=0, padx=10, pady=10)
 show_eligible_button = tk.Button(button_frame, text="Show Eligible Students", command=lambda: notebook.select(eligible_page), font=("Arial", 14), width=20, bg="#FF9800", fg="white")
 show_eligible_button.grid(row=1, column=0, padx=10, pady=10)
 
+# Scrollable Frame Class
+class ScrollableFrame(ttk.Frame):
+    def __init__(self, container, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+        self.canvas = tk.Canvas(self)
+        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = ttk.Frame(self.canvas)
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
+
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="n", width=560)
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        self.canvas.pack(side="left", fill="both", expand=True, padx=20)
+        self.scrollbar.pack(side="right", fill="y")
+
 # Show Courses Page
 courses_page = ttk.Frame(notebook)
 courses_page.pack(fill="both", expand=True)
 notebook.add(courses_page, text="Show Courses")
 
-# Add widgets for courses page
-program_name_label = tk.Label(courses_page, text="Enter Program Name:", font=("Arial", 12))
+scrollable_courses = ScrollableFrame(courses_page)
+scrollable_courses.pack(fill="both", expand=True)
+
+program_name_label = tk.Label(scrollable_courses.scrollable_frame, text="Enter Program Name:", font=("Arial", 12))
 program_name_label.pack(pady=10)
 
-program_name_entry = tk.Entry(courses_page, width=50, font=("Arial", 12))
+program_name_entry = tk.Entry(scrollable_courses.scrollable_frame, width=50, font=("Arial", 12))
 program_name_entry.pack(pady=5)
 
-semester_label = tk.Label(courses_page, text="Enter Semester Number:", font=("Arial", 12))
+semester_label = tk.Label(scrollable_courses.scrollable_frame, text="Enter Semester Number:", font=("Arial", 12))
 semester_label.pack(pady=10)
 
-semester_entry = tk.Entry(courses_page, width=50, font=("Arial", 12))
+semester_entry = tk.Entry(scrollable_courses.scrollable_frame, width=50, font=("Arial", 12))
 semester_entry.pack(pady=5)
 
-check_courses_button = tk.Button(courses_page, text="Check Courses", command=lambda: show_courses(program_name_entry, semester_entry, courses_label), font=("Arial", 12), bg="#4CAF50", fg="white")
+check_courses_button = tk.Button(scrollable_courses.scrollable_frame, text="Check Courses", command=lambda: show_courses(program_name_entry, semester_entry, courses_label), font=("Arial", 12), bg="#4CAF50", fg="white")
 check_courses_button.pack(pady=15)
 
-courses_label = tk.Label(courses_page, text="Courses will appear here.", font=("Arial", 12))
+courses_label = tk.Label(scrollable_courses.scrollable_frame, text="Courses will appear here.", font=("Arial", 12))
 courses_label.pack(pady=10)
 
-export_courses_button = tk.Button(courses_page, text="Export Courses to CSV", command=lambda: export_courses_to_csv(courses_label.cget("text").split("\n")[1:]), font=("Arial", 12), bg="#FFC107", fg="white")
+export_courses_button = tk.Button(scrollable_courses.scrollable_frame, text="Export Courses to CSV", command=lambda: export_courses_to_csv(courses_label.cget("text").split("\n")[1:]), font=("Arial", 12), bg="#FFC107", fg="white")
 export_courses_button.pack(pady=10)
 
 # Show Eligible Students Page
@@ -201,20 +222,22 @@ eligible_page = ttk.Frame(notebook)
 eligible_page.pack(fill="both", expand=True)
 notebook.add(eligible_page, text="Show Eligible Students")
 
-# Add widgets for eligible students page
-course_name_label = tk.Label(eligible_page, text="Enter Course Name to Check Eligibility:", font=("Arial", 12))
+scrollable_eligible = ScrollableFrame(eligible_page)
+scrollable_eligible.pack(fill="both", expand=True)
+
+course_name_label = tk.Label(scrollable_eligible.scrollable_frame, text="Enter Course Name to Check Eligibility:", font=("Arial", 12))
 course_name_label.pack(pady=10)
 
-course_name_entry = tk.Entry(eligible_page, width=50, font=("Arial", 12))
+course_name_entry = tk.Entry(scrollable_eligible.scrollable_frame, width=50, font=("Arial", 12))
 course_name_entry.pack(pady=5)
 
-check_button = tk.Button(eligible_page, text="Check Eligibility", command=lambda: show_eligible_students(course_name_entry, result_label), font=("Arial", 12), bg="#FF9800", fg="white")
+check_button = tk.Button(scrollable_eligible.scrollable_frame, text="Check Eligibility", command=lambda: show_eligible_students(course_name_entry, result_label), font=("Arial", 12), bg="#FF9800", fg="white")
 check_button.pack(pady=15)
 
-result_label = tk.Label(eligible_page, text="Eligible students will appear here.", font=("Arial", 12))
+result_label = tk.Label(scrollable_eligible.scrollable_frame, text="Eligible students will appear here.", font=("Arial", 12))
 result_label.pack(pady=10)
 
-export_button = tk.Button(eligible_page, text="Export Eligible Students to CSV", command=lambda: export_eligible_students_to_csv(result_label.cget("text").split("\n")[1:]), font=("Arial", 12), bg="#FF9800", fg="white")
+export_button = tk.Button(scrollable_eligible.scrollable_frame, text="Export Eligible Students to CSV", command=lambda: export_eligible_students_to_csv(result_label.cget("text").split("\n")[1:]), font=("Arial", 12), bg="#FF9800", fg="white")
 export_button.pack(pady=10)
 
 # Run the application
