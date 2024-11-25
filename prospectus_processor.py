@@ -5,73 +5,40 @@ from typing import List, Optional, Tuple
 import logging
 import json
 
+from constants.database import config
+from constants.database import schema
+from constants.database import insertions
 
 @dataclass
 class Course:
     course_code: str
     course_title: str
-    credit_hours_class: int
-    credit_hours_lab: int
-    prerequisites: Optional[str] = None
+    credit_hours: int
+    prerequisite_course_code: Optional[str] = None
 
 class CourseProcessor:
-    def __init__(self, pdf_path: str, db_path: str = "courses.db"):
+    programs = ["Artificial Intelligence", "Computer Science", "Cyber Security", "Data Science", "Software Engineering"]
+    
+    def __init__(self, pdf_path: str):
         self.pdf_path = pdf_path
-        self.db_path = db_path
+        self.db_path = config.DB_NAME
         self.logger = logging.getLogger(__name__)
         self._initialize_database()
 
     def _initialize_database(self):
-        """
-        Sets up the database schema if it does not already exist.
-        """
+        """Sets up the database schema if it does not already exist."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             
-            # Create Programs table
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS Programs (
-                Program_Name TEXT PRIMARY KEY
-            )''')
-
-            # Create Courses table (no longer references Program directly)
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS Courses (
-                Course_Code TEXT PRIMARY KEY,
-                Course_Title TEXT,
-                Credit_Hours_Class INTEGER,
-                Credit_Hours_Lab INTEGER,
-                Pre_requisites TEXT
-            )''')
-
-            # Create Program_Courses table to link Programs and Courses with Semester
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS Program_Courses (
-                Program_Name TEXT,
-                Course_Code TEXT,
-                Semester INTEGER,
-                PRIMARY KEY (Program_Name, Course_Code, Semester),
-                FOREIGN KEY (Program_Name) REFERENCES Programs (Program_Name),
-                FOREIGN KEY (Course_Code) REFERENCES Courses (Course_Code)
-            )''')
-
-            # Create Prerequisites table
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS Prerequisites (
-                Course_Code TEXT,
-                Prerequisite_Code TEXT,
-                FOREIGN KEY (Course_Code) REFERENCES Courses (Course_Code),
-                FOREIGN KEY (Prerequisite_Code) REFERENCES Courses (Course_Code),
-                PRIMARY KEY (Course_Code, Prerequisite_Code)
-            )''')
+            # Create tables using schema constants
+            cursor.execute(schema.CREATE_TABLE_PROGRAMS)
+            cursor.execute(schema.CREATE_TABLE_COURSES)
+            cursor.execute(schema.CREATE_TABLE_PROGRAM_COURSES)
 
             self.logger.info("Database schema initialized.")
 
-
     def extract_course_text(self, program_name: str) -> str:
-        """
-        Extracts text containing the study plan from the PDF.
-        """
+        """Extracts text containing the study plan from the PDF."""
         search_term = f"Tentative Study Plan-Bachelor of Science ({program_name})"
         try:
             with fitz.open(self.pdf_path) as doc:
@@ -90,9 +57,7 @@ class CourseProcessor:
             raise
 
     def parse_courses(self, text: str, program_name: str) -> List[Course]:
-        """
-        Parses the course details from the extracted text.
-        """
+        """Parses the course details from the extracted text."""
         lines = [line.strip() for line in text.split('\n')]
         courses = []
         idx, semester, total_count = 0, 0, 0
@@ -116,17 +81,26 @@ class CourseProcessor:
                 credit_hours_lab, idx = int(lines[idx]), idx + 1
                 prereq = lines[idx] if lines[idx] != '—' else None
                 idx += 1
-                course = Course(
+
+                # Create the base course (including lab credit if >1)
+                courses.append((Course(
                     course_code=course_code,
                     course_title=course_title,
-                    credit_hours_class=credit_hours_class,
-                    credit_hours_lab=credit_hours_lab,
-                    prerequisites=prereq,
-                )
-                self.logger.debug(f"Parsed course: {json.dumps(course.__dict__, indent=2)}")
-                courses.append((course, program_name, semester))  # Include program_name and semester
-        return courses
+                    credit_hours=credit_hours_class + (credit_hours_lab if credit_hours_lab > 1 else 0),
+                    prerequisite_course_code=prereq,
+                ), program_name, semester))
 
+                # Create a separate lab course if lab credits = 1
+                if credit_hours_lab == 1:
+                    lab_code = course_code[:1] + 'L' + course_code[2:]
+                    lab_title = f"{course_title} - Lab"
+                    courses.append((Course(
+                        course_code=lab_code,
+                        course_title=lab_title,
+                        credit_hours=1,
+                        prerequisite_course_code=prereq,
+                    ), program_name, semester))
+        return courses
 
     def _extract_multiline_code(self, lines: List[str], idx: int) -> Tuple[str, int]:
         course_code = lines[idx]
@@ -145,28 +119,15 @@ class CourseProcessor:
         return course_title, idx
 
     def insert_courses(self, courses: List[Tuple[Course, str, int]]):
-        """
-        Inserts courses into the database.
-        """
+        """Inserts courses into the database."""
         programs = {program for _, program, _ in courses}
-        prerequisites = []
-
-        # Prepare course data and prerequisites
         course_data = []
-        program_courses = []  # To store (program_name, course_code, semester) data
+        program_courses = []
+
         for course, program_name, semester in courses:
-            if course.prerequisites:
-                # Split prerequisites by ';' and add to prerequisites list
-                for prereq in course.prerequisites.split(';'):
-                    prerequisites.append((course.course_code, prereq.strip()))
-
-            # Course data: We no longer include program_name in the Courses table
             course_data.append((
-                course.course_code, course.course_title, course.credit_hours_class,
-                course.credit_hours_lab, course.prerequisites
+                course.course_code, course.course_title, course.credit_hours, course.prerequisite_course_code
             ))
-
-            # Program-Courses associations: we store program_name, course_code, and semester in Program_Courses
             program_courses.append((program_name, course.course_code, semester))
 
         with sqlite3.connect(self.db_path) as conn:
@@ -174,71 +135,46 @@ class CourseProcessor:
             cursor = conn.cursor()
 
             try:
-                # Insert programs one by one into Programs table
+                # Bulk insertions
                 self.logger.debug(f"Inserting programs: {programs}")
-                for program in programs:
-                    try:
-                        cursor.execute('INSERT OR IGNORE INTO Programs (Program_Name) VALUES (?)', (program,))
-                        self.logger.debug(f"Inserted program: {program}")
-                    except sqlite3.Error as e:
-                        self.logger.error(f"Error inserting program '{program}': {e}")
-                        raise  # Re-raise the error to stop further execution
+                cursor.executemany(insertions.INSERT_PROGRAM, [(program,) for program in programs])
 
-                # Insert courses one by one into Courses table
-                self.logger.debug(f"Inserting courses: {course_data}")
-                for course in course_data:
-                    try:
-                        cursor.execute('''
-                            INSERT OR IGNORE INTO Courses (
-                                Course_Code, Course_Title, Credit_Hours_Class, Credit_Hours_Lab, Pre_requisites
-                            ) VALUES (?, ?, ?, ?, ?)
-                        ''', course)
-                        self.logger.debug(f"Inserted course: {course}")
-                    except sqlite3.Error as e:
-                        self.logger.error(f"Error inserting course '{course}': {e}")
-                        raise  # Re-raise the error to stop further execution
+                # Insert all courses first (ignoring prerequisites for now)
+                course_data = [
+                    (course.course_code, course.course_title, course.credit_hours, None)
+                    for course, _, _ in courses
+                ]
+                cursor.executemany(insertions.INSERT_COURSE, course_data)
 
-                # Insert program-course associations into Program_Courses table
+                # Update prerequisites after all courses are inserted
+                # ensures foreign key constraints are met
+                update_query = '''
+                UPDATE courses
+                SET prerequisite_course_code = ?
+                WHERE course_code = ?
+                '''
+                prerequisites_data = [
+                    (course.prerequisite_course_code, course.course_code)
+                    for course, _, _ in courses if course.prerequisite_course_code
+                ]
+                cursor.executemany(update_query, prerequisites_data)
+
+
                 self.logger.debug(f"Inserting program-course associations: {program_courses}")
-                for program_course in program_courses:
-                    try:
-                        cursor.execute('''
-                            INSERT OR IGNORE INTO Program_Courses (Program_Name, Course_Code, Semester)
-                            VALUES (?, ?, ?)
-                        ''', program_course)
-                        self.logger.debug(f"Inserted program-course association: {program_course}")
-                    except sqlite3.Error as e:
-                        self.logger.error(f"Error inserting program-course association '{program_course}': {e}")
-                        raise  # Re-raise the error to stop further execution
-
-                # Insert prerequisites one by one into the Prerequisites table
-                self.logger.debug(f"Inserting prerequisites: {prerequisites}")
-                for prerequisite in prerequisites:
-                    try:
-                        cursor.execute('''
-                            INSERT OR IGNORE INTO Prerequisites (Course_Code, Prerequisite_Code)
-                            VALUES (?, ?)
-                        ''', prerequisite)
-                        self.logger.debug(f"Inserted prerequisite: {prerequisite}")
-                    except sqlite3.Error as e:
-                        self.logger.error(f"Error inserting prerequisite '{prerequisite}': {e}")
-                        raise  # Re-raise the error to stop further execution
+                cursor.executemany(insertions.INSERT_PROGRAM_COURSE, program_courses)
+                conn.commit()
 
                 self.logger.info(f"Rows inserted into the database.")
-            
             except sqlite3.Error as e:
-                # Catch any SQLite error that occurs during the insertions
-                self.logger.error(f"Database error occurred: {e}")
-                raise  # Re-raise the error to propagate it further
+                self.logger.error(f"Error inserting data into database: {e}")
+                conn.rollback()
+                raise
             except Exception as e:
-                # Catch any other unexpected error
                 self.logger.error(f"Unexpected error occurred: {e}")
-                raise  # Re-raise the error to propagate it further
+                raise
 
     def process_program(self, program_name: str):
-        """
-        Orchestrates parsing and database insertion for a single program.
-        """
+        """Orchestrates parsing and database insertion for a single program."""
         try:
             text = self.extract_course_text(program_name)
             courses = self.parse_courses(text, program_name)
@@ -246,20 +182,19 @@ class CourseProcessor:
         except Exception as e:
             self.logger.error(f"Failed to process program '{program_name}': {e}")
 
-
 if __name__ == "__main__":
     logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s [%(levelname)s] %(message)s (line %(lineno)d)",
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
             logging.FileHandler("course_processor.log"),
             logging.StreamHandler()
         ]
     )
 
+    #! change for the GUI
     pdf_path = "Computing Programs.pdf"
     processor = CourseProcessor(pdf_path)
 
-    programs = ["Artificial Intelligence", "Computer Science", "Cyber Security", "Data Science", "Software Engineering"]
-    for program in programs:
+    for program in CourseProcessor.programs:
         processor.process_program(program)
