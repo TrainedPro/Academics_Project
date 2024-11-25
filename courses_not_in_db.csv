@@ -1,0 +1,22 @@
+Code,Title,Credit Hours,Prerequisite Code
+AF1001,Fundamentals of Accounting,3,None
+CS2007,Human Computer Interaction,3,SE1001
+MG1001,Fundamentals of Management,3,None
+SL2002,Software Design and Architecture - Lab,1,CS1004
+SE3001,Software Construction and Development,3,SE2002
+SL3001,Software Construction and Development - Lab,1,SE2002
+SE3003,Web Engineering,3,None
+SL3003,Web Engineering - Lab,1,None
+SS1002,Islamic Studies/Ethics,3,None
+SS1003,Pakistan Studies,3,None
+SS1004,English Composition and Comprehension,2,None
+SL1004,English Composition and Comprehension - Lab,1,None
+SS1008,Communication and Presentation Skills,2,None
+SL1008,Communication and Presentation Skills - Lab,1,None
+SS2003,Psychology,3,None
+CS4041,Computer Modeling and Simulation,3,None
+MT4031,Operations Research,3,None
+SE4033,Formal Methods in Software Engineering,3,None
+SS2016,Community Service,3,None
+MT1008,Multivariable Calculus,3,None
+SS1018,Understanding Holy Quran,3,None
