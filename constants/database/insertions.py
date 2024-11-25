@@ -33,3 +33,10 @@ INSERT_GRADE = '''
 INSERT OR IGNORE INTO grades (roll_no, course_code, grade)
 VALUES (?, ?, ?)
 '''
+
+INSERT_STUDENT = '''
+INSERT OR IGNORE INTO Students (
+    Roll_No, Name, Cr_Attended, Cr_Earned, Cgpa, Warning, Status
+) VALUES (?, ?, ?, ?, ?, ?, ?)
+'''
+
