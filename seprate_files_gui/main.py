@@ -52,13 +52,40 @@ def main():
     courses_page = ui_components.create_courses_page(notebook, PROGRAM_OPTIONS, SEMESTER_OPTIONS)
     eligible_page = ui_components.create_eligible_students_page(notebook, COURSE_OPTIONS)
     add_course_page = ui_components.create_add_course_page(notebook)
+    manage_grades_page = ui_components.create_manage_grades_page(notebook) 
+    # Create Teachers Page
+    teachers_page = ui_components.create_teachers_page(notebook)
 
+
+    
+
+    # New Manage Grades Page
+    
+
+    # Add pages to the notebook
     notebook.add(courses_page, text="Show Courses")
     notebook.add(eligible_page, text="Show Eligible Students")
     notebook.add(add_course_page, text="Add Course")
+    notebook.add(manage_grades_page, text="Manage Grades")  # Add Manage Grades Tab
+    notebook.add(teachers_page, text="Manage Teachers")
 
     # Create sidebar buttons
     ui_components.create_sidebar_buttons(sidebar_frame, notebook, button_style)
+
+    # Add a sidebar button for Manage Grades
+    manage_grades_button = tk.Button(
+        sidebar_frame, 
+        text="Manage Grades", 
+        command=lambda: notebook.select(notebook.tabs()[-1]),  # Navigate to Manage Grades Tab
+        bg="#9B59B6", 
+        activebackground="#8E44AD", 
+        font=("Arial", 12), 
+        width=22, 
+        bd=0, 
+        fg='white', 
+        activeforeground='white'
+    )
+    manage_grades_button.pack(pady=10)
 
     # Run the Tkinter main loop
     root.mainloop()

@@ -185,3 +185,160 @@ def export_eligible_students_to_csv(eligible_students):
     else:
         messagebox.showinfo("No Data", "No eligible students to export.")
 
+def submit_grade(roll_no_var, course_var, grade_var):
+    """Submit the grade for a student."""
+    roll_no = roll_no_var.get()
+    course_info = course_var.get()
+    grade = grade_var.get()
+
+    if not roll_no or not course_info or not grade:
+        messagebox.showerror("Input Error", "Please fill in all fields.")
+        return
+
+    # Extract course code from course_info
+    course_code = course_info.split(" - ")[0]
+
+    result = database.insert_grade(roll_no, course_code, grade)
+    
+    if "added" in result.lower():
+        messagebox.showinfo("Success", result)
+    elif "already exists" in result.lower():
+        messagebox.showwarning("Warning", result)
+    else:
+        messagebox.showerror("Error", result)
+
+        
+        
+def create_labeled_dropdown(parent, label_text, dropdown):
+    """Create a labeled dropdown menu."""
+    label = tk.Label(parent, text=label_text, font=("Arial", 12))
+    label.pack(pady=10)
+
+    dropdown.pack(pady=5)
+    
+import sqlite3
+from tkinter import messagebox
+import database  # Assuming you have a database module to manage DB connections
+
+
+def add_teacher(teacher_name_var, subject_var):
+    """Add a new teacher to the database."""
+    teacher_name = teacher_name_var.get()
+    specialty = subject_var.get()  # specialty corresponds to course_code
+
+    if not teacher_name or not specialty:
+        messagebox.showerror("Input Error", "Please fill in all fields.")
+        return
+
+    try:
+        conn = database.connect_database('project.sqlite3')
+        cursor = conn.cursor()
+        query = '''
+        INSERT INTO teachers (name, specialty)
+        VALUES (?, ?)
+        '''
+        cursor.execute(query, (teacher_name, specialty))  # specialty is the course_code
+        conn.commit()
+        conn.close()
+        messagebox.showinfo("Success", f"Teacher '{teacher_name}' added successfully!")
+        
+        # Clear the form fields after submission
+        teacher_name_var.set('')
+        subject_var.set('')
+        
+    except sqlite3.Error as e:
+        messagebox.showerror("Database Error", f"An error occurred: {str(e)}")
+
+
+def fetch_teachers(teacher_tree):
+    """Fetch all teachers from the database and populate the treeview."""
+    try:
+        conn = database.connect_database('project.sqlite3')
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, specialty FROM teachers")  # specialty is the course_code
+        teachers = cursor.fetchall()
+        for teacher in teachers:
+            teacher_tree.insert("", "end", values=teacher)  # Insert teacher's name and specialty (course_code)
+        conn.close()
+    except sqlite3.Error as e:
+        messagebox.showerror("Database Error", f"An error occurred while fetching teachers: {str(e)}")
+
+
+def assign_course_to_teacher(teacher_var, course_var, credit_hours_var):
+    """Assign the selected course and credit hours to the selected teacher."""
+    teacher_name = teacher_var.get()
+    course_info = course_var.get()
+    credit_hours = credit_hours_var.get()
+
+    if not teacher_name or not course_info or not credit_hours:
+        messagebox.showerror("Input Error", "Please select both a teacher, a course, and enter credit hours.")
+        return
+
+    # Extract the course code from the course_info (e.g., "CS101 - Introduction to CS")
+    course_code = course_info.split(" - ")[0]
+
+    try:
+        # Fetch teacher ID from teacher name
+        conn = database.connect_database('project.sqlite3')
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM teachers WHERE name = ?", (teacher_name,))
+        teacher_id = cursor.fetchone()
+
+        if not teacher_id:
+            messagebox.showerror("Database Error", "Teacher not found in the database.")
+            return
+
+        teacher_id = teacher_id[0]  # Get the teacher ID
+        
+        # Insert the teacher-course relationship into the teacher_courses table
+        query = '''
+        INSERT INTO teacher_courses (teacher_id, course_code, credit_hours)
+        VALUES (?, ?, ?)
+        '''
+        cursor.execute(query, (teacher_id, course_code, credit_hours))
+        conn.commit()
+        conn.close()
+        
+        messagebox.showinfo("Success", f"Course '{course_code}' successfully assigned to teacher '{teacher_name}' with {credit_hours} credit hours.")
+        
+    except sqlite3.Error as e:
+        messagebox.showerror("Database Error", f"An error occurred: {str(e)}")
+
+
+def refresh_teacher_dropdown(teacher_dropdown):
+    """Refresh the teacher dropdown list with updated data from the database."""
+    try:
+        conn = database.connect_database('project.sqlite3')
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM teachers")
+        teachers = cursor.fetchall()
+        conn.close()
+        
+        teacher_options = [teacher[0] for teacher in teachers]
+        teacher_dropdown['values'] = teacher_options
+        if teacher_options:
+            teacher_dropdown.set(teacher_options[-1])  # Set to the latest added teacher
+        else:
+            teacher_dropdown.set("Select Teacher")
+    except sqlite3.Error as e:
+        messagebox.showerror("Database Error", f"An error occurred while refreshing the teacher dropdown: {str(e)}")
+
+
+def refresh_teacher_table(teacher_tree):
+    """Refresh the teacher list table with updated data from the database."""
+    try:
+        # Clear existing entries in the treeview
+        for row in teacher_tree.get_children():
+            teacher_tree.delete(row)
+
+        conn = database.connect_database('project.sqlite3')
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, specialty FROM teachers")  # specialty is the course_code
+        teachers = cursor.fetchall()
+        conn.close()
+
+        # Insert teachers into the treeview
+        for teacher in teachers:
+            teacher_tree.insert("", "end", values=teacher)  # Insert teacher's name and specialty (course_code)
+    except sqlite3.Error as e:
+        messagebox.showerror("Database Error", f"An error occurred while refreshing the teacher table: {str(e)}")

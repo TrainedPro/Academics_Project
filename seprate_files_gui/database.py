@@ -76,3 +76,30 @@ def insert_course(course_code, course_title, credit_hours, prerequisite_course_c
     cursor.execute(INSERT_COURSE, (course_code, course_title, credit_hours, prerequisite_course_code))
     conn.commit()
     conn.close()
+    
+def insert_grade(roll_no, course_code, grade):
+    """
+    Insert a new grade for a student into the grades table.
+    If the combination of roll_no and course_code already exists, ignore the insertion.
+    """
+    conn = connect_database('project.sqlite3')
+    cursor = conn.cursor()
+    
+    INSERT_GRADE = '''
+    INSERT OR IGNORE INTO grades (roll_no, course_code, grade)
+    VALUES (?, ?, ?)
+    '''
+    
+    try:
+        cursor.execute(INSERT_GRADE, (roll_no, course_code, grade))
+        conn.commit()
+        
+        # Check if the row was added
+        if cursor.rowcount > 0:
+            return f"Grade '{grade}' added for Roll No: {roll_no} in Course: {course_code}."
+        else:
+            return f"Grade for Roll No: {roll_no} and Course: {course_code} already exists."
+    except sqlite3.Error as e:
+        return f"Database Error: {str(e)}"
+    finally:
+        conn.close()

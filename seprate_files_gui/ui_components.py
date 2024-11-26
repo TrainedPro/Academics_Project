@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+import sqlite3
 import database
 import utils
 from utils import show_courses, add_course_to_program, remove_course_from_program, fetch_courses_from_db, populate_course_dropdown
@@ -283,3 +284,346 @@ def create_add_course_page(notebook):
     footer_label.pack(pady=20)
 
     return add_course_page
+def create_manage_grades_page(notebook):
+    """Create the Manage Grades page for submitting grades."""
+    manage_grades_page = ttk.Frame(notebook)
+    scrollable_grades_frame = ScrollableFrame(manage_grades_page)
+    scrollable_grades_frame.pack(fill="both", expand=True)
+
+    # Fetch student roll numbers from the database
+    conn = database.connect_database('project.sqlite3')
+    cursor = conn.cursor()
+    cursor.execute("SELECT roll_no FROM students")
+    roll_numbers = [row[0] for row in cursor.fetchall()]
+
+    # Fetch courses from the database
+    cursor.execute("SELECT course_code, course_title FROM courses")
+    courses = cursor.fetchall()
+    conn.close()
+
+    # Create a dropdown for Student Roll Numbers
+    roll_no_var = tk.StringVar()
+    roll_no_dropdown = ttk.Combobox(
+        scrollable_grades_frame.scrollable_frame,
+        textvariable=roll_no_var,
+        values=roll_numbers,
+        width=50,
+        state="readonly"
+    )
+    roll_no_dropdown.set("Select Roll No")
+    utils.create_labeled_dropdown(
+        scrollable_grades_frame.scrollable_frame,
+        "Select Student Roll No:",
+        roll_no_dropdown
+    )
+
+    # Create a dropdown for courses
+    course_var = tk.StringVar()
+    course_options = [f"{course[0]} - {course[1]}" for course in courses]
+    course_dropdown = ttk.Combobox(
+        scrollable_grades_frame.scrollable_frame,
+        textvariable=course_var,
+        values=course_options,
+        width=50,
+        state="readonly"
+    )
+    course_dropdown.set("Select Course")
+    utils.create_labeled_dropdown(
+        scrollable_grades_frame.scrollable_frame,
+        "Select Course:",
+        course_dropdown
+    )
+
+    # Dropdown for Grades
+    grade_var = tk.StringVar()
+    grade_options = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "F"]
+    grade_dropdown = ttk.Combobox(
+        scrollable_grades_frame.scrollable_frame,
+        textvariable=grade_var,
+        values=grade_options,
+        width=50,
+        state="readonly"
+    )
+    grade_dropdown.set("Select Grade")
+    utils.create_labeled_dropdown(
+        scrollable_grades_frame.scrollable_frame,
+        "Select Grade:",
+        grade_dropdown
+    )
+
+    # Submit Grade Button
+    submit_grade_button = tk.Button(
+        scrollable_grades_frame.scrollable_frame,
+        text="Submit Grade",
+        command=lambda: utils.submit_grade(roll_no_var, course_var, grade_var),
+        font=("Arial", 12),
+        bg="#2ECC71",
+        activebackground="#27AE60"
+    )
+    submit_grade_button.pack(pady=10)
+
+    # Footer
+    footer_label = tk.Label(
+        scrollable_grades_frame.scrollable_frame,
+        text="Fast Batch Advisor Automation System",
+        font=("Arial", 10),
+        fg="gray"
+    )
+    footer_label.pack(pady=20)
+
+    return manage_grades_page
+
+
+import tkinter as tk
+from tkinter import ttk, messagebox
+import utils
+import database
+
+def create_teachers_page(notebook):
+    """Create the Teachers page for managing teachers and assigning courses."""
+    teachers_page = ttk.Frame(notebook)
+    scrollable_teachers_frame = ScrollableFrame(teachers_page)
+    scrollable_teachers_frame.pack(fill="both", expand=True)
+
+    # Fetch courses from the database
+    conn = database.connect_database('project.sqlite3')
+    cursor = conn.cursor()
+    cursor.execute("SELECT course_code, course_title FROM courses")
+    courses = cursor.fetchall()
+    conn.close()
+
+    # Create a dropdown for Course selection (course_code)
+    course_var = tk.StringVar()
+    course_options = [f"{course[0]} - {course[1]}" for course in courses]  # Format as 'code - title'
+    course_dropdown = ttk.Combobox(
+        scrollable_teachers_frame.scrollable_frame,
+        textvariable=course_var,
+        values=course_options,
+        width=50,
+        state="readonly"
+    )
+    course_dropdown.set("Select Course")
+    utils.create_labeled_dropdown(
+        scrollable_teachers_frame.scrollable_frame,
+        "Select Course:",
+        course_dropdown
+    )
+
+    # Entry for Credit Hours
+    credit_hours_var = tk.StringVar()
+    utils.create_labeled_entry(
+        scrollable_teachers_frame.scrollable_frame,
+        "Enter Credit Hours:",
+        credit_hours_var
+    )
+
+    # Create a dropdown for Teacher selection (will be refreshed after adding a teacher)
+    teacher_var = tk.StringVar()
+    teacher_options = []  # Start with an empty list
+    teacher_dropdown = ttk.Combobox(
+        scrollable_teachers_frame.scrollable_frame,
+        textvariable=teacher_var,
+        values=teacher_options,
+        width=50,
+        state="readonly"
+    )
+    teacher_dropdown.set("Select Teacher")
+    utils.create_labeled_dropdown(
+        scrollable_teachers_frame.scrollable_frame,
+        "Select Teacher:",
+        teacher_dropdown
+    )
+
+    # Refresh the teacher dropdown with the latest data from the database
+    refresh_teacher_dropdown(teacher_dropdown)
+
+    # Assign Course to Teacher Button
+    assign_course_button = tk.Button(
+        scrollable_teachers_frame.scrollable_frame,
+        text="Assign Course to Teacher",
+        command=lambda: assign_course_to_teacher(teacher_var, course_var, credit_hours_var, assigned_courses_tree),
+        font=("Arial", 12),
+        bg="#2ECC71",
+        activebackground="#27AE60"
+    )
+    assign_course_button.pack(pady=10)
+
+    # Add Teacher Form (name and specialty dropdown)
+    teacher_name_var = tk.StringVar()
+    specialty_var = tk.StringVar()
+
+    utils.create_labeled_entry(
+        scrollable_teachers_frame.scrollable_frame,
+        "Enter Teacher Name:",
+        teacher_name_var
+    )
+
+    # Teacher Specialty Dropdown (courses)
+    specialty_dropdown = ttk.Combobox(
+        scrollable_teachers_frame.scrollable_frame,
+        textvariable=specialty_var,
+        values=[f"{course[0]} - {course[1]}" for course in courses],
+        state="readonly",
+        width=50
+    )
+    specialty_dropdown.set("Select Specialty (Course)")
+    utils.create_labeled_dropdown(
+        scrollable_teachers_frame.scrollable_frame,
+        "Select Specialty (Course):",
+        specialty_dropdown
+    )
+
+    # Add Teacher Button
+    add_teacher_button = tk.Button(
+        scrollable_teachers_frame.scrollable_frame,
+        text="Add Teacher",
+        command=lambda: add_teacher_and_refresh(teacher_name_var, specialty_var, teacher_dropdown),
+        font=("Arial", 12),
+        bg="#2ECC71",
+        activebackground="#27AE60"
+    )
+    add_teacher_button.pack(pady=10)
+
+    # Assigned Courses List Table (showing teacher, course, and credit hours)
+    assigned_courses_tree = ttk.Treeview(
+        scrollable_teachers_frame.scrollable_frame, 
+        columns=("Teacher Name", "Course Code", "Course Title", "Credit Hours"), 
+        show="headings"
+    )
+    assigned_courses_tree.heading("Teacher Name", text="Teacher Name")
+    assigned_courses_tree.heading("Course Code", text="Course Code")
+    assigned_courses_tree.heading("Course Title", text="Course Title")
+    assigned_courses_tree.heading("Credit Hours", text="Credit Hours")
+    assigned_courses_tree.column("Teacher Name", width=200)
+    assigned_courses_tree.column("Course Code", width=100)
+    assigned_courses_tree.column("Course Title", width=200)
+    assigned_courses_tree.column("Credit Hours", width=100)
+    assigned_courses_tree.pack(padx=20, pady=10, fill=tk.BOTH, expand=True)
+
+    # Fetch the list of teachers with their assigned courses
+    refresh_assigned_courses_table(assigned_courses_tree)
+
+    return teachers_page
+
+
+def add_teacher_and_refresh(teacher_name_var, specialty_var, teacher_dropdown):
+    """Add a new teacher and refresh the teacher dropdown."""
+    teacher_name = teacher_name_var.get()
+    specialty = specialty_var.get()  # specialty corresponds to course_code
+
+    if not teacher_name or not specialty:
+        messagebox.showerror("Input Error", "Please fill in all fields.")
+        return
+
+    try:
+        # Add teacher to the database
+        conn = database.connect_database('project.sqlite3')
+        cursor = conn.cursor()
+        query = '''
+        INSERT INTO teachers (name, specialty)
+        VALUES (?, ?)
+        '''
+        cursor.execute(query, (teacher_name, specialty))  # specialty is the course_code
+        conn.commit()
+        conn.close()
+
+        messagebox.showinfo("Success", f"Teacher '{teacher_name}' added successfully!")
+        
+        # Clear the form fields after submission
+        teacher_name_var.set('')
+        specialty_var.set('')
+
+        # Refresh the teacher dropdown
+        refresh_teacher_dropdown(teacher_dropdown)
+        
+    except sqlite3.Error as e:
+        messagebox.showerror("Database Error", f"An error occurred: {str(e)}")
+
+
+def refresh_teacher_dropdown(teacher_dropdown):
+    """Refresh the teacher dropdown list with updated data from the database."""
+    conn = database.connect_database('project.sqlite3')
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM teachers")
+    teachers = cursor.fetchall()
+    conn.close()
+    
+    teacher_options = [teacher[0] for teacher in teachers]
+    teacher_dropdown['values'] = teacher_options
+    if teacher_options:
+        teacher_dropdown.set(teacher_options[-1])  # Set to the latest added teacher
+    else:
+        teacher_dropdown.set("Select Teacher")
+
+
+def refresh_assigned_courses_table(assigned_courses_tree):
+    """Fetch and refresh the table with teacher-course assignments (including credit hours)."""
+    # Clear existing entries
+    for row in assigned_courses_tree.get_children():
+        assigned_courses_tree.delete(row)
+
+    try:
+        # Fetch teacher-course assignments with credit hours from the teacher_courses table
+        conn = database.connect_database('project.sqlite3')
+        cursor = conn.cursor()
+
+        # Query to get teacher name, course code, course title, and credit hours
+        cursor.execute("""
+            SELECT t.name, c.course_code, c.course_title, tc.credit_hours
+            FROM teachers t
+            JOIN teacher_courses tc ON t.id = tc.teacher_id
+            JOIN courses c ON c.course_code = tc.course_code
+        """)
+        assigned_courses = cursor.fetchall()
+        conn.close()
+
+        # Insert the data into the table
+        for row in assigned_courses:
+            assigned_courses_tree.insert("", "end", values=row)  # Insert teacher's name, course info, and credit hours
+
+    except sqlite3.Error as e:
+        messagebox.showerror("Database Error", f"An error occurred: {str(e)}")
+
+def assign_course_to_teacher(teacher_name_var, course_var, credit_hours_var, assigned_courses_tree):
+    """Assign the selected course and credit hours to the selected teacher."""
+    teacher_name = teacher_name_var.get()
+    course_info = course_var.get()
+    credit_hours = credit_hours_var.get()
+
+    if not teacher_name or not course_info or not credit_hours:
+        messagebox.showerror("Input Error", "Please select both a teacher, a course, and enter credit hours.")
+        return
+
+    # Extract the course code from the course_info (e.g., "CS101 - Introduction to CS")
+    course_code = course_info.split(" - ")[0]
+    course_title = course_info.split(" - ")[1]
+
+    try:
+        # Fetch teacher ID from teacher name
+        conn = database.connect_database('project.sqlite3')
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM teachers WHERE name = ?", (teacher_name,))
+        teacher_id = cursor.fetchone()
+
+        if not teacher_id:
+            messagebox.showerror("Database Error", "Teacher not found in the database.")
+            return
+
+        teacher_id = teacher_id[0]  # Get the teacher ID
+
+        # Insert the course, teacher ID, and credit hours into the teacher_courses table
+        query = '''
+        INSERT INTO teacher_courses (teacher_id, course_code, credit_hours)
+        VALUES (?, ?, ?)
+        '''
+        cursor.execute(query, (teacher_id, course_code, credit_hours))
+        conn.commit()
+        conn.close()
+
+        messagebox.showinfo("Success", f"Course '{course_code}' successfully assigned to teacher '{teacher_name}' with {credit_hours} credit hours.")
+
+        # Refresh the assigned courses table to display the newly assigned course
+        refresh_assigned_courses_table(assigned_courses_tree)
+
+    except sqlite3.Error as e:
+        messagebox.showerror("Database Error", f"An error occurred: {str(e)}")
