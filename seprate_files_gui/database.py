@@ -16,6 +16,7 @@ def fetch_courses_by_program_and_semester(program, semester, cursor):
     courses = cursor.fetchall()
     return [course[0] for course in courses]
 
+
 def get_prerequisite(course_name, cursor):
     """Get prerequisite course code for a given course name."""
     query = '''
@@ -32,8 +33,10 @@ def get_eligible_students(db_path, course_name):
     conn = connect_database(db_path)
     cursor = conn.cursor()
 
+    # Get the prerequisite course code for the given course
     prerequisite_course_code = get_prerequisite(course_name, cursor)
-    
+
+    # If the course has a prerequisite, use the appropriate query
     if prerequisite_course_code:
         query = '''
         SELECT 
@@ -47,21 +50,34 @@ def get_eligible_students(db_path, course_name):
         WHERE 
             c.course_title = ? 
             AND g.grade IN ('-', 'F', 'W', 'I')
-            AND EXISTS (
-                SELECT 1
-                FROM courses prerequisite
-                WHERE prerequisite.course_code = c.prerequisite_course_code
-                AND prerequisite.course_code = ?
-            );
+            AND c.prerequisite_course_code = ?  -- Directly check the prerequisite
+            AND s.enrollment_status = 'Current';  -- Use 'enrollment_status' instead of 'specialization'
         '''
         cursor.execute(query, (course_name, prerequisite_course_code))
         students = cursor.fetchall()
-        conn.close()
-
-        return [student[0] for student in students], len(students)
+    
+    # If the course does not have a prerequisite, just check if students are enrolled
+    else:
+        query = '''
+        SELECT 
+            s.name
+        FROM 
+            students s
+        JOIN 
+            grades g ON s.roll_no = g.roll_no
+        JOIN 
+            courses c ON g.course_code = c.course_code
+        WHERE 
+            c.course_title = ? 
+            AND g.grade IN ('-', 'F', 'W', 'I')
+            AND s.enrollment_status = 'Current';  -- Ensure 'current' enrollment status
+        '''
+        cursor.execute(query, (course_name,))
+        students = cursor.fetchall()
 
     conn.close()
-    return [], 0
+    
+    return [student[0] for student in students], len(students)
 
 def insert_course(course_code, course_title, credit_hours, prerequisite_course_code):
     """Insert a new course into the database."""
@@ -103,3 +119,22 @@ def insert_grade(roll_no, course_code, grade):
         return f"Database Error: {str(e)}"
     finally:
         conn.close()
+def insert_student(roll_no, name, section, credit_hours_attempted, credit_hours_earned, cgpa, warning_status, enrollment_status, specialization):
+    conn = connect_database("project.sqlite3")
+    cursor = conn.cursor()
+    query = '''
+    INSERT OR REPLACE INTO students (
+        roll_no, 
+        name, 
+        section,
+        credit_hours_attempted, 
+        credit_hours_earned, 
+        cgpa, 
+        warning_status, 
+        enrollment_status,
+        specialization
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    '''
+    cursor.execute(query, (roll_no, name, section, credit_hours_attempted, credit_hours_earned, cgpa, warning_status, enrollment_status, specialization))
+    conn.commit()
+    cursor.close()

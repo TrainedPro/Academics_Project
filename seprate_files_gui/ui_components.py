@@ -187,41 +187,94 @@ def remove_course_from_table(courses_tree):
     messagebox.showinfo("Success", "Selected course removed successfully!")
 
 
-def create_eligible_students_page(notebook, course_options):
-    """Create the Show Eligible Students page."""
+import tkinter as tk
+import tkinter.ttk as ttk
+import database
+
+import tkinter as tk
+import tkinter.ttk as ttk
+import database
+
+import tkinter as tk
+import tkinter.ttk as ttk
+import database
+
+def create_eligible_students_page(notebook, course_options=None):
+    """Create the Show Eligible Students page dynamically."""
     eligible_page = ttk.Frame(notebook)
     scrollable_eligible = ScrollableFrame(eligible_page)
     scrollable_eligible.pack(fill="both", expand=True)
 
-    # Course Name Dropdown
-    course_name_label = tk.Label(scrollable_eligible.scrollable_frame, text="Select Course Name:", font=("Arial", 12))
-    course_name_label.pack(pady=10)
+    def create_dynamic_eligible_page():
+        # Clear existing widgets
+        for widget in scrollable_eligible.scrollable_frame.winfo_children():
+            widget.destroy()
 
-    course_name_var = tk.StringVar()
-    course_name_dropdown = ttk.Combobox(
-        scrollable_eligible.scrollable_frame, 
-        textvariable=course_name_var, 
-        values=course_options, 
-        width=50, 
-        state="readonly"
-    )
-    course_name_dropdown.pack(pady=5)
+        # Dynamically fetch course options from database
+        conn = database.connect_database('project.sqlite3')
+        cursor = conn.cursor()
+        cursor.execute("SELECT course_code, course_title FROM courses")
+        course_data = cursor.fetchall()
+        conn.close()
 
-    # Result Label
-    result_label = tk.Label(scrollable_eligible.scrollable_frame, text="", font=("Arial", 12), justify="left")
-    result_label.pack(pady=20)
+        # Create course options with both code and title
+        course_options_dynamic = [f"{course[0]} - {course[1]}" for course in course_data]
 
-    # Show Eligible Students Button
-    show_eligible_button = tk.Button(
-        scrollable_eligible.scrollable_frame, 
-        text="Show Eligible Students", 
-        command=lambda: utils.show_eligible_students(course_name_var, result_label), 
-        font=("Arial", 12)
-    )
-    show_eligible_button.pack(pady=10)
+        # Use passed course_options if provided, otherwise use dynamically fetched options
+        final_course_options = course_options if course_options is not None else course_options_dynamic
+
+        # Course Name Dropdown
+        course_name_label = tk.Label(
+            scrollable_eligible.scrollable_frame, 
+            text="Select Course Name:", 
+            font=("Arial", 12)
+        )
+        course_name_label.pack(pady=10)
+
+        course_name_var = tk.StringVar()
+        course_name_dropdown = ttk.Combobox(
+            scrollable_eligible.scrollable_frame, 
+            textvariable=course_name_var, 
+            values=final_course_options, 
+            width=50, 
+            state="readonly"
+        )
+        course_name_dropdown.pack(pady=5)
+        course_name_dropdown.set("Select Course")
+
+        # Result Label
+        result_label = tk.Label(
+            scrollable_eligible.scrollable_frame, 
+            text="", 
+            font=("Arial", 12), 
+            justify="left"
+        )
+        result_label.pack(pady=20)
+
+        # Show Eligible Students Button
+        show_eligible_button = tk.Button(
+            scrollable_eligible.scrollable_frame, 
+            text="Show Eligible Students", 
+            command=lambda: utils.show_eligible_students(course_name_var, result_label), 
+            font=("Arial", 12)
+        )
+        show_eligible_button.pack(pady=10)
+
+        # Refresh Button
+        refresh_button = tk.Button(
+            scrollable_eligible.scrollable_frame,
+            text="Refresh Courses",
+            command=create_dynamic_eligible_page,
+            font=("Arial", 12),
+            bg="#3498DB",
+            activebackground="#2980B9"
+        )
+        refresh_button.pack(pady=5)
+
+    # Initial creation of dynamic page
+    create_dynamic_eligible_page()
 
     return eligible_page
-
 def create_add_course_page(notebook):
     """Create the Add Course page."""
     add_course_page = ttk.Frame(notebook)
@@ -284,96 +337,126 @@ def create_add_course_page(notebook):
     footer_label.pack(pady=20)
 
     return add_course_page
+import tkinter as tk
+from tkinter import ttk
+import database  # Assuming this module connects to your database
+import utils  # Assuming utility functions like 'create_labeled_dropdown' are in this module
+
+import tkinter as tk
+import tkinter.ttk as ttk
+import database
+
 def create_manage_grades_page(notebook):
-    """Create the Manage Grades page for submitting grades."""
+    """Create the Manage Grades page for submitting grades dynamically."""
+
     manage_grades_page = ttk.Frame(notebook)
     scrollable_grades_frame = ScrollableFrame(manage_grades_page)
     scrollable_grades_frame.pack(fill="both", expand=True)
 
-    # Fetch student roll numbers from the database
-    conn = database.connect_database('project.sqlite3')
-    cursor = conn.cursor()
-    cursor.execute("SELECT roll_no FROM students")
-    roll_numbers = [row[0] for row in cursor.fetchall()]
-
-    # Fetch courses from the database
-    cursor.execute("SELECT course_code, course_title FROM courses")
-    courses = cursor.fetchall()
-    conn.close()
-
-    # Create a dropdown for Student Roll Numbers
+    # Variables to store current data and dropdowns
     roll_no_var = tk.StringVar()
-    roll_no_dropdown = ttk.Combobox(
-        scrollable_grades_frame.scrollable_frame,
-        textvariable=roll_no_var,
-        values=roll_numbers,
-        width=50,
-        state="readonly"
-    )
-    roll_no_dropdown.set("Select Roll No")
-    utils.create_labeled_dropdown(
-        scrollable_grades_frame.scrollable_frame,
-        "Select Student Roll No:",
-        roll_no_dropdown
-    )
-
-    # Create a dropdown for courses
     course_var = tk.StringVar()
-    course_options = [f"{course[0]} - {course[1]}" for course in courses]
-    course_dropdown = ttk.Combobox(
-        scrollable_grades_frame.scrollable_frame,
-        textvariable=course_var,
-        values=course_options,
-        width=50,
-        state="readonly"
-    )
-    course_dropdown.set("Select Course")
-    utils.create_labeled_dropdown(
-        scrollable_grades_frame.scrollable_frame,
-        "Select Course:",
-        course_dropdown
-    )
-
-    # Dropdown for Grades
     grade_var = tk.StringVar()
-    grade_options = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "F"]
-    grade_dropdown = ttk.Combobox(
-        scrollable_grades_frame.scrollable_frame,
-        textvariable=grade_var,
-        values=grade_options,
-        width=50,
-        state="readonly"
-    )
-    grade_dropdown.set("Select Grade")
-    utils.create_labeled_dropdown(
-        scrollable_grades_frame.scrollable_frame,
-        "Select Grade:",
-        grade_dropdown
-    )
 
-    # Submit Grade Button
-    submit_grade_button = tk.Button(
-        scrollable_grades_frame.scrollable_frame,
-        text="Submit Grade",
-        command=lambda: utils.submit_grade(roll_no_var, course_var, grade_var),
-        font=("Arial", 12),
-        bg="#2ECC71",
-        activebackground="#27AE60"
-    )
-    submit_grade_button.pack(pady=10)
+    # Create dynamic update mechanism
+    def create_dynamic_dropdowns():
+        # Clear existing widgets
+        for widget in scrollable_grades_frame.scrollable_frame.winfo_children():
+            widget.destroy()
 
-    # Footer
-    footer_label = tk.Label(
-        scrollable_grades_frame.scrollable_frame,
-        text="Fast Batch Advisor Automation System",
-        font=("Arial", 10),
-        fg="gray"
-    )
-    footer_label.pack(pady=20)
+        # Fetch current data from database
+        conn = database.connect_database('project.sqlite3')
+        cursor = conn.cursor()
+
+        # Fetch student roll numbers dynamically
+        cursor.execute("SELECT roll_no FROM students")
+        roll_numbers = [row[0] for row in cursor.fetchall()]
+
+        # Fetch courses dynamically
+        cursor.execute("SELECT course_code, course_title FROM courses")
+        courses = cursor.fetchall()
+        conn.close()
+
+        # Dynamically create dropdown for Student Roll Numbers
+        roll_no_dropdown = ttk.Combobox(
+            scrollable_grades_frame.scrollable_frame,
+            textvariable=roll_no_var,
+            values=roll_numbers,
+            width=50,
+            state="readonly"
+        )
+        utils.create_labeled_dropdown(
+            scrollable_grades_frame.scrollable_frame,
+            "Select Student Roll No:",
+            roll_no_dropdown
+        )
+
+        # Dynamically create dropdown for courses
+        course_options = [f"{course[0]} - {course[1]}" for course in courses]
+        course_dropdown = ttk.Combobox(
+            scrollable_grades_frame.scrollable_frame,
+            textvariable=course_var,
+            values=course_options,
+            width=50,
+            state="readonly"
+        )
+        utils.create_labeled_dropdown(
+            scrollable_grades_frame.scrollable_frame,
+            "Select Course:",
+            course_dropdown
+        )
+
+        # Dynamically create dropdown for Grades
+        grade_options = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "F", "-"]
+        grade_dropdown = ttk.Combobox(
+            scrollable_grades_frame.scrollable_frame,
+            textvariable=grade_var,
+            values=grade_options,
+            width=50,
+            state="readonly"
+        )
+        grade_dropdown.set("Select Grade")
+        utils.create_labeled_dropdown(
+            scrollable_grades_frame.scrollable_frame,
+            "Select Grade:",
+            grade_dropdown
+        )
+
+        # Submit Grade Button
+        submit_grade_button = tk.Button(
+            scrollable_grades_frame.scrollable_frame,
+            text="Submit Grade",
+            command=lambda: utils.submit_grade(roll_no_var, course_var, grade_var),
+            font=("Arial", 12),
+            bg="#2ECC71",
+            activebackground="#27AE60"
+        )
+        submit_grade_button.pack(pady=10)
+
+        # Refresh Button
+        refresh_button = tk.Button(
+            scrollable_grades_frame.scrollable_frame,
+            text="Refresh Data",
+            command=create_dynamic_dropdowns,
+            font=("Arial", 12),
+            bg="#3498DB",
+            activebackground="#2980B9"
+        )
+        refresh_button.pack(pady=5)
+
+        # Footer
+        footer_label = tk.Label(
+            scrollable_grades_frame.scrollable_frame,
+            text="Fast Batch Advisor Automation System",
+            font=("Arial", 10),
+            fg="gray"
+        )
+        footer_label.pack(pady=20)
+
+    # Initial creation of dynamic dropdowns
+    create_dynamic_dropdowns()
 
     return manage_grades_page
-
-
 import tkinter as tk
 from tkinter import ttk, messagebox
 import utils
@@ -627,3 +710,81 @@ def assign_course_to_teacher(teacher_name_var, course_var, credit_hours_var, ass
 
     except sqlite3.Error as e:
         messagebox.showerror("Database Error", f"An error occurred: {str(e)}")
+        
+
+def create_labeled_entry(parent, label_text, variable):
+    """Create a labeled entry with a specific variable."""
+    label = tk.Label(parent, text=label_text, font=("Arial", 12))
+    label.pack(pady=10)
+
+    entry = tk.Entry(
+        parent, 
+        textvariable=variable, 
+        width=50, 
+        font=("Arial", 12)
+    )
+    entry.pack(pady=5)
+    return entry
+
+def add_student_form(root):
+    """Create the form to add a student."""
+    frame = tk.Frame(root)
+    frame.pack(pady=20)
+
+    # Create variables for new fields
+    name_var = tk.StringVar()
+    roll_no_var = tk.StringVar()
+    section_var = tk.StringVar()
+    credit_hours_attempted_var = tk.IntVar()
+    credit_hours_earned_var = tk.IntVar()
+    cgpa_var = tk.DoubleVar()
+    warning_status_var = tk.StringVar()
+    enrollment_status_var = tk.StringVar()
+    specialization_var = tk.StringVar()
+
+    # Create labeled entry fields
+    create_labeled_entry(frame, "Student Name", name_var)
+    create_labeled_entry(frame, "Roll Number", roll_no_var)
+    create_labeled_entry(frame, "Section", section_var)
+    create_labeled_entry(frame, "Credit Hours Attempted", credit_hours_attempted_var)
+    create_labeled_entry(frame, "Credit Hours Earned", credit_hours_earned_var)
+    create_labeled_entry(frame, "CGPA", cgpa_var)
+    create_labeled_entry(frame, "Warning Status", warning_status_var)
+    create_labeled_entry(frame, "Enrollment Status", enrollment_status_var)
+    create_labeled_entry(frame, "Specialization", specialization_var)
+
+    # Add Submit button
+    def submit():
+        name = name_var.get()
+        roll_no = roll_no_var.get()
+        section = section_var.get()
+        credit_hours_attempted = credit_hours_attempted_var.get()
+        credit_hours_earned = credit_hours_earned_var.get()
+        cgpa = cgpa_var.get()
+        warning_status = warning_status_var.get()
+        enrollment_status = enrollment_status_var.get()
+        specialization = specialization_var.get()
+
+        if not name or not roll_no or not section or credit_hours_attempted <= 0 or credit_hours_earned < 0 or cgpa <= 0 or not warning_status or not enrollment_status or not specialization:
+            messagebox.showerror("Input Error", "Please fill in all the fields correctly.")
+            return
+        
+        # Call database function to insert student
+        database.insert_student(roll_no, name, section, credit_hours_attempted, credit_hours_earned, cgpa, warning_status, enrollment_status, specialization)
+        messagebox.showinfo("Success", f"Student {name} added successfully!")
+        
+        # Clear form after successful submission
+        name_var.set("")
+        roll_no_var.set("")
+        section_var.set("")
+        credit_hours_attempted_var.set(0)
+        credit_hours_earned_var.set(0)
+        cgpa_var.set(0.0)
+        warning_status_var.set("")
+        enrollment_status_var.set("")
+        specialization_var.set("")
+
+    submit_btn = tk.Button(frame, text="Add Student", command=submit, font=("Arial", 12))
+    submit_btn.pack(pady=10)
+
+    return frame  # Return the frame so it can be added to the notebook

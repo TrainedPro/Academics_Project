@@ -146,10 +146,16 @@ def show_eligible_students(course_name_var, result_label):
         messagebox.showerror("Input Error", "Please select a course name.")
         return
 
-    eligible_students, count = database.get_eligible_students('project.sqlite3', course_name)
+    # Extract course code from the new format "course_code - course_title"
+    if " - " in course_name:
+        course_code = course_name.split(" - ")[0]
+    else:
+        course_code = course_name
+
+    eligible_students, count = database.get_eligible_students('project.sqlite3', course_code)
 
     if count == 0:
-        messagebox.showinfo("No Eligible Students", f"No students are eligible for the course '{course_name}'.")
+        messagebox.showinfo("No Eligible Students", f"No students are eligible for the course '{course_code}'.")
     else:
         result_text = f"Eligible Students Count: {count}\n\n" + "\n".join(eligible_students)
         
@@ -158,7 +164,8 @@ def show_eligible_students(course_name_var, result_label):
 
         result_label.config(text=result_text)
         export_eligible_students_to_csv(eligible_students)
-
+        
+        
 def add_course(course_code_var, course_title_var, credit_hours_var, prerequisite_course_code_var):
     """Add a new course to the database."""
     course_code = course_code_var.get()
@@ -342,3 +349,76 @@ def refresh_teacher_table(teacher_tree):
             teacher_tree.insert("", "end", values=teacher)  # Insert teacher's name and specialty (course_code)
     except sqlite3.Error as e:
         messagebox.showerror("Database Error", f"An error occurred while refreshing the teacher table: {str(e)}")
+
+
+import tkinter as tk
+from tkinter import messagebox
+from database import insert_student  # Assuming insert_student is properly defined
+
+def create_labeled_entry(frame, label, var):
+    """Helper function to create a label and entry field."""
+    label_widget = tk.Label(frame, text=label)
+    label_widget.pack(pady=5)
+    entry_widget = tk.Entry(frame, textvariable=var)
+    entry_widget.pack(pady=5)
+
+def add_student_form(root):
+    """Create the form to add a student."""
+    frame = tk.Frame(root)
+    frame.pack(pady=20)
+
+    # Create variables for new fields
+    name_var = tk.StringVar()
+    roll_no_var = tk.StringVar()
+    section_var = tk.StringVar()
+    credit_hours_attempted_var = tk.IntVar()
+    credit_hours_earned_var = tk.IntVar()
+    cgpa_var = tk.DoubleVar()
+    warning_status_var = tk.StringVar()
+    enrollment_status_var = tk.StringVar()
+    specialization_var = tk.StringVar()
+
+    # Create labeled entry fields
+    create_labeled_entry(frame, "Student Name", name_var)
+    create_labeled_entry(frame, "Roll Number", roll_no_var)
+    create_labeled_entry(frame, "Section", section_var)
+    create_labeled_entry(frame, "Credit Hours Attempted", credit_hours_attempted_var)
+    create_labeled_entry(frame, "Credit Hours Earned", credit_hours_earned_var)
+    create_labeled_entry(frame, "CGPA", cgpa_var)
+    create_labeled_entry(frame, "Warning Status", warning_status_var)
+    create_labeled_entry(frame, "Enrollment Status", enrollment_status_var)
+    create_labeled_entry(frame, "Specialization", specialization_var)
+
+    # Add Submit button
+    def submit():
+        name = name_var.get()
+        roll_no = roll_no_var.get()
+        section = section_var.get()
+        credit_hours_attempted = credit_hours_attempted_var.get()
+        credit_hours_earned = credit_hours_earned_var.get()
+        cgpa = cgpa_var.get()
+        warning_status = warning_status_var.get()
+        enrollment_status = enrollment_status_var.get()
+        specialization = specialization_var.get()
+
+        if not name or not roll_no or not section or credit_hours_attempted <= 0 or credit_hours_earned < 0 or cgpa <= 0 or not warning_status or not enrollment_status or not specialization:
+            messagebox.showerror("Input Error", "Please fill in all the fields correctly.")
+            return
+        
+        # Call database function to insert student
+        insert_student(roll_no, name, section, credit_hours_attempted, credit_hours_earned, cgpa, warning_status, enrollment_status, specialization)
+        messagebox.showinfo("Success", f"Student {name} added successfully!")
+        
+        # Clear form after successful submission
+        name_var.set("")
+        roll_no_var.set("")
+        section_var.set("")
+        credit_hours_attempted_var.set(0)
+        credit_hours_earned_var.set(0)
+        cgpa_var.set(0.0)
+        warning_status_var.set("")
+        enrollment_status_var.set("")
+        specialization_var.set("")
+
+    submit_btn = tk.Button(frame, text="Add Student", command=submit, font=("Arial", 12))
+    submit_btn.pack(pady=10)
