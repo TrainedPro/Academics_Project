@@ -711,9 +711,52 @@ def assign_course_to_teacher(teacher_name_var, course_var, credit_hours_var, ass
     except sqlite3.Error as e:
         messagebox.showerror("Database Error", f"An error occurred: {str(e)}")
         
+import re
+
+def roll_no_exists(roll_no):
+    """
+    Check if a roll number already exists in the database.
+    
+    :param roll_no: Roll number to check
+    :return: True if roll number exists, False otherwise
+    """
+    conn = database.connect_database("project.sqlite3")
+    if not conn:
+        return False
+
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("SELECT COUNT(*) FROM students WHERE roll_no = ?", (roll_no,))
+        count = cursor.fetchone()[0]
+        return count > 0
+    except sqlite3.Error as e:
+        messagebox.showerror("Database Query Error", str(e))
+        return False
+    finally:
+        conn.close()
+
+def validate_roll_no(roll_no):
+    """
+    Validate roll number format: xxp-xxxx
+    """
+    pattern = r'^[1-9]{2}p-\d{4}$'
+    return re.match(pattern, roll_no) is not None
+
+def validate_cgpa(cgpa):
+    """
+    Validate CGPA between 0 and 4.0
+    """
+    try:
+        cgpa_float = float(cgpa)
+        return 0 <= cgpa_float <= 4.0
+    except ValueError:
+        return False
 
 def create_labeled_entry(parent, label_text, variable):
-    """Create a labeled entry with a specific variable."""
+    """
+    Create a labeled entry with a specific variable.
+    """
     label = tk.Label(parent, text=label_text, font=("Arial", 12))
     label.pack(pady=10)
 
@@ -727,7 +770,9 @@ def create_labeled_entry(parent, label_text, variable):
     return entry
 
 def add_student_form(root):
-    """Create the form to add a student."""
+    """
+    Create the form to add a student.
+    """
     frame = tk.Frame(root)
     frame.pack(pady=20)
 
@@ -738,7 +783,7 @@ def add_student_form(root):
     credit_hours_attempted_var = tk.IntVar()
     credit_hours_earned_var = tk.IntVar()
     cgpa_var = tk.DoubleVar()
-    warning_status_var = tk.StringVar()
+    warning_status_var = tk.IntVar(value=0)
     enrollment_status_var = tk.StringVar()
     specialization_var = tk.StringVar()
 
@@ -749,42 +794,118 @@ def add_student_form(root):
     create_labeled_entry(frame, "Credit Hours Attempted", credit_hours_attempted_var)
     create_labeled_entry(frame, "Credit Hours Earned", credit_hours_earned_var)
     create_labeled_entry(frame, "CGPA", cgpa_var)
-    create_labeled_entry(frame, "Warning Status", warning_status_var)
-    create_labeled_entry(frame, "Enrollment Status", enrollment_status_var)
+
+    # Warning Status as Spinbox (0-3)
+    warning_label = tk.Label(frame, text="Warning Status", font=("Arial", 12))
+    warning_label.pack(pady=10)
+    warning_spinbox = tk.Spinbox(
+        frame, 
+        from_=0, 
+        to=3, 
+        textvariable=warning_status_var, 
+        width=50, 
+        font=("Arial", 12)
+    )
+    warning_spinbox.pack(pady=5)
+
+    # Enrollment Status Dropdown
+    enrollment_status_label = tk.Label(frame, text="Enrollment Status", font=("Arial", 12))
+    enrollment_status_label.pack(pady=10)
+    enrollment_status_dropdown = ttk.Combobox(
+        frame, 
+        textvariable=enrollment_status_var, 
+        values=["Current", "Suspended", "Finished"], 
+        width=47, 
+        font=("Arial", 12),
+        state="readonly"
+    )
+    enrollment_status_dropdown.pack(pady=5)
+
     create_labeled_entry(frame, "Specialization", specialization_var)
 
     # Add Submit button
     def submit():
-        name = name_var.get()
-        roll_no = roll_no_var.get()
-        section = section_var.get()
+        # Retrieve values
+        name = name_var.get().strip()
+        roll_no = roll_no_var.get().strip()
+        section = section_var.get().strip()
         credit_hours_attempted = credit_hours_attempted_var.get()
         credit_hours_earned = credit_hours_earned_var.get()
         cgpa = cgpa_var.get()
         warning_status = warning_status_var.get()
-        enrollment_status = enrollment_status_var.get()
-        specialization = specialization_var.get()
+        enrollment_status = enrollment_status_var.get().strip()
+        specialization = specialization_var.get().strip()
 
-        if not name or not roll_no or not section or credit_hours_attempted <= 0 or credit_hours_earned < 0 or cgpa <= 0 or not warning_status or not enrollment_status or not specialization:
-            messagebox.showerror("Input Error", "Please fill in all the fields correctly.")
+        # Validation checks
+        errors = []
+
+        # 1. Name validation (not empty)
+        if not name:
+            errors.append("Student Name cannot be empty")
+
+        # 2. Roll Number validation (xxp-xxxx format)
+        if not validate_roll_no(roll_no):
+            errors.append("Invalid Roll Number. Format must be xxp-xxxx (e.g., 22p-1234)")
+        
+        # 2.1 Check if Roll Number already exists in database
+        if roll_no_exists(roll_no):
+            errors.append("Roll Number already exists in the database")
+
+        # 3. Section validation (not empty)
+        if not section:
+            errors.append("Section cannot be empty")
+
+        # 4. Credit Hours Attempted validation (> 0)
+        if credit_hours_attempted <= 0:
+            errors.append("Credit Hours Attempted must be greater than 0")
+
+        # 5. Credit Hours Earned validation (≤ Attempted)
+        if credit_hours_earned < 0 or credit_hours_earned > credit_hours_attempted:
+            errors.append("Credit Hours Earned must be between 0 and Credit Hours Attempted")
+
+        # 6. CGPA validation (0-4.0)
+        if not validate_cgpa(cgpa):
+            errors.append("CGPA must be between 0 and 4.0")
+
+        # 7. Warning Status validation (0-3)
+        if warning_status < 0 or warning_status > 3:
+            errors.append("Warning Status must be between 0 and 3")
+
+        # 8. Enrollment Status validation (not empty)
+        if not enrollment_status:
+            errors.append("Enrollment Status must be selected")
+
+        # 9. Specialization validation (not empty)
+        if not specialization:
+            errors.append("Specialization cannot be empty")
+
+        # Check if there are any validation errors
+        if errors:
+            # Show all validation errors
+            messagebox.showerror("Validation Errors", "\n".join(errors))
             return
         
-        # Call database function to insert student
-        database.insert_student(roll_no, name, section, credit_hours_attempted, credit_hours_earned, cgpa, warning_status, enrollment_status, specialization)
-        messagebox.showinfo("Success", f"Student {name} added successfully!")
-        
-        # Clear form after successful submission
-        name_var.set("")
-        roll_no_var.set("")
-        section_var.set("")
-        credit_hours_attempted_var.set(0)
-        credit_hours_earned_var.set(0)
-        cgpa_var.set(0.0)
-        warning_status_var.set("")
-        enrollment_status_var.set("")
-        specialization_var.set("")
+        # Insert student record
+        if database.insert_student(
+            roll_no, name, section, 
+            credit_hours_attempted, credit_hours_earned, 
+            cgpa, warning_status, 
+            enrollment_status, specialization
+        ):
+            messagebox.showinfo("Success", f"Student {name} added successfully!")
+            
+            # Clear form after successful submission
+            name_var.set("")
+            roll_no_var.set("")
+            section_var.set("")
+            credit_hours_attempted_var.set(0)
+            credit_hours_earned_var.set(0)
+            cgpa_var.set(0.0)
+            warning_status_var.set(0)
+            enrollment_status_var.set("")
+            specialization_var.set("")
 
     submit_btn = tk.Button(frame, text="Add Student", command=submit, font=("Arial", 12))
     submit_btn.pack(pady=10)
 
-    return frame  # Return the frame so it can be added to the notebook
+    return frame

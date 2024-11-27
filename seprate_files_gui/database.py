@@ -49,9 +49,9 @@ def get_eligible_students(db_path, course_name):
             courses c ON g.course_code = c.course_code
         WHERE 
             c.course_title = ? 
-            AND g.grade IN ('-', 'F', 'W', 'I')
+            AND NOT (s.warning_status = 2 AND g.grade = '-') -- Exclude students with warning = 2 and grade = '-'
             AND c.prerequisite_course_code = ?  -- Directly check the prerequisite
-            AND s.enrollment_status = 'Current';  -- Use 'enrollment_status' instead of 'specialization'
+            AND s.enrollment_status = 'Current';  -- Ensure current enrollment
         '''
         cursor.execute(query, (course_name, prerequisite_course_code))
         students = cursor.fetchall()
@@ -69,8 +69,8 @@ def get_eligible_students(db_path, course_name):
             courses c ON g.course_code = c.course_code
         WHERE 
             c.course_title = ? 
-            AND g.grade IN ('-', 'F', 'W', 'I')
-            AND s.enrollment_status = 'Current';  -- Ensure 'current' enrollment status
+            AND NOT (s.warning_status = 2 AND g.grade = '-') -- Exclude students with warning = 2 and grade = '-'
+            AND s.enrollment_status = 'Current';  -- Ensure current enrollment
         '''
         cursor.execute(query, (course_name,))
         students = cursor.fetchall()
@@ -78,6 +78,7 @@ def get_eligible_students(db_path, course_name):
     conn.close()
     
     return [student[0] for student in students], len(students)
+
 
 def insert_course(course_code, course_title, credit_hours, prerequisite_course_code):
     """Insert a new course into the database."""
